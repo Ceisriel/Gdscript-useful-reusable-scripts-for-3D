@@ -1,0 +1,56 @@
+extends Control
+
+
+onready var cursor = $"../../Camroot/h/v/Camera/Aim"
+onready var HPbar = $Healthbar
+onready var ENbar = $Energybar
+onready var REbar = $Resolvebar
+onready var HPlabel = $Healthbar/HP
+onready var ENlabel = $Energybar/EN
+onready var RElabel = $Resolvebar/RE
+onready var name_label = $Name
+onready var level_label = $Level
+onready var int_label = $TextureRect3/Int
+onready var str_label = $TextureRect2/Str
+onready var vit_label = $TextureRect/Vit
+onready var def_label = $Defense
+onready var res_label = $Resistance
+
+
+func getEnemyInfo():
+		if cursor.is_colliding():
+						# Clear any previous exceptions
+			cursor.clear_exceptions()
+			# Add your own body to the exceptions
+			cursor.add_exception($"..")
+			var body = cursor.get_collider()
+			if body.is_in_group("Entity"):
+				var body_stats = body.get_node("Stats")
+				visible = true 
+				HPbar.value = body_stats.health
+				HPbar.max_value = body_stats.max_health
+				ENbar.value = body_stats.energy
+				ENbar.max_value = body_stats.max_energy
+				REbar.value = body_stats.resolve
+				REbar.max_value = body_stats.max_resolve
+				var health_text = "HP: %.2f / %.2f" % [body_stats.health, body_stats.max_health]
+				var energy_text = "EN: %.2f / %.2f" % [body_stats.energy, body_stats.max_energy]
+				var resolve_text = "RE: %.2f / %.2f" % [body_stats.resolve, body_stats.max_resolve]
+				HPlabel.text = health_text
+				ENlabel.text = energy_text
+				RElabel.text = resolve_text
+				name_label.text = body_stats.entity_name
+				level_label.text = "level %d" % body_stats.level
+				int_label.text = "Int %.2f" % body_stats.intelligence
+				str_label.text = "Str %.2f" % body_stats.strength
+				vit_label.text = "Str %.2f" % body_stats.vitality
+				def_label.text = "Defense %d" % body_stats.defense
+				res_label.text = "Resistance %d" % body_stats.resistance
+			else:
+				visible = false
+		else:
+				visible = false
+
+
+func _on_Refresh_timeout():
+	getEnemyInfo()
