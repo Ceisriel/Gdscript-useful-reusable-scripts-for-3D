@@ -1,0 +1,12 @@
+func _on_TextureButton_mouse_entered():
+	var tool_tip_instance = tool_tip.instance()
+# Set the position of the tool_tip_instance to the right of the TextureButton
+	tool_tip_instance.rect_position.x = $AllUIHere/Skills/WardenSkills/TextureButton.rect_size.x + 10  # Adjust 10 as needed
+	tool_tip_instance.rect_position.y = $AllUIHere/Skills/WardenSkills/TextureButton.rect_position.y  # Maintain the same height	
+	$AllUIHere/Skills/WardenSkills/TextureButton.add_child(tool_tip_instance)
+	
+func _on_TextureButton_mouse_exited():
+	# Remove all children from the TextureButton
+	for child in $AllUIHere/Skills/WardenSkills/TextureButton.get_children():
+		child.queue_free()
+		
