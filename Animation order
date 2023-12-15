@@ -1,0 +1,90 @@
+func animationsSwordAndShield(delta):
+	if Input.is_action_pressed("aim"): #block
+		if  dash_countforward ==2:
+			an.play("slide",blend)
+		elif  dash_countleft ==2:
+			an.play_backwards("dodge right",blend)
+		elif  dash_countright ==2:
+			an.play("dodge right",blend)
+		elif  dash_countback ==2:
+			an.play_backwards("backstep",blend)
+		elif Input.is_action_pressed("attack"):
+			an.play("pomel strike",blend)#placeholder counter attack
+			horizontal_velocity = Vector3.ZERO
+		elif Input.is_action_pressed("forward") and Input.is_action_pressed("left"):
+			an.play("left front sword and shield block",blend)
+		elif Input.is_action_pressed("backward") and Input.is_action_pressed("left"):
+			an.play_backwards("right front sword and shield block",blend)
+		elif Input.is_action_pressed("backward") and Input.is_action_pressed("right"):
+			an.play_backwards("left front sword and shield block",blend)
+		elif Input.is_action_pressed("forward") and Input.is_action_pressed("right"):
+			an.play("right front sword and shield block", blend)
+		elif Input.is_action_pressed("backward"):
+			an.play_backwards("walk sword and shield block ",blend)
+		elif Input.is_action_pressed("left"):
+			an.play("left sword and shield block",blend)
+		elif Input.is_action_pressed("right"):
+			an.play("right sword and shield block",blend)
+		elif Input.is_action_pressed("forward"):
+			an.play("walk sword and shield block ",blend)
+		else:
+			an.play("block shield",blend/2)	
+	else:
+		if dash_countback ==2 or dash_countleft ==2 or dash_countright ==2 or dash_countforward ==2:
+			an.play("slide",blend)
+
+		elif Input.is_action_pressed("E"):
+			an.play("fury strike cycle", blend +0.1)
+			moveAttack2(delta)
+		elif Input.is_action_pressed("attack"):
+			an.play("combo attack sword and shield cycle")
+			moveAttack(delta)
+		elif is_sliding and attacking:
+			an.play("swirl melee attack")
+		elif is_walking:
+			an.play("walk dual wield")		
+		else:
+			an.play("idle combat")
+
+
+
+
+func animationStrafe(): #strafe
+	#dodge section is prioritized
+		if dash_countback ==2:
+			an.play("backstep",blend)
+		elif dash_countleft ==2:
+			an.play("TPose",blend)
+		elif dash_countright ==2:
+			an.play("TPose",blend)
+		elif dash_countforward ==2:
+			an.play_backwards("backstep",blend)
+	#strafing walk 
+		elif Input.is_action_pressed("forward") and Input.is_action_pressed("left"):
+			an.play("left front",blend)
+		elif Input.is_action_pressed("backward") and Input.is_action_pressed("left"):
+			an.play_backwards("right front",blend)
+		elif Input.is_action_pressed("backward") and Input.is_action_pressed("right"):
+			an.play_backwards("left front",blend)
+		elif Input.is_action_pressed("forward") and Input.is_action_pressed("right"):
+			an.play("right front", blend)
+		elif Input.is_action_pressed("backward"):
+			an.play_backwards("walk",blend)
+		elif Input.is_action_pressed("left"):
+			an.play("left",blend)
+		elif Input.is_action_pressed("right"):
+			an.play("right",blend)
+		elif Input.is_action_pressed("forward"):
+			an.play("walk")
+		elif Input.is_action_just_pressed("ui_accept"):
+			an.play_backwards("landing")
+		else:
+			an.play("idle",blend)
+
+
+
+
+
+
+
+
