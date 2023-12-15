@@ -1,0 +1,1056 @@
+extends KinematicBody
+#camera
+var camrot_h = 0
+var camrot_v = 0
+onready var parent = $".."
+export var cam_v_max = 75 # -75 recommended
+export var cam_v_min = -55 # -55 recommended
+onready var camera_v =$Camroot/h/v
+onready var camera_h =$Camroot/h
+onready var camera = $Camroot/h/v/Camera
+var h_sensitivity = .1
+var v_sensitivity = .1
+var rot_speed_multiplier = .15 #reduce this to make the rotation radius larger
+var h_acceleration = 10
+var v_acceleration = 10
+var mouse_captured = true
+#player rotation, animation and otherwise mostly visual stuff
+onready var player_mesh = get_node("Mesh")
+onready var an = $Mesh/AnimationPlayer
+var blend = 0.25
+var is_in_combat = false
+var duel_wield_mode = false
+var bow_mode = false
+var two_handed_sword_mode = false
+var one_handed_sword_mode = false
+var sword_and_shield_mode = false
+var crossbow_mode = false
+var magic_staff_mode = false
+var barehanded_mode = true
+var can_move = true 
+#collision booleans 
+var has_ride = false 
+# movement variables
+var velocity := Vector3()
+export var gravity = 9.8
+export var jump_force = 5
+export var sprint_speed = 14
+var teleport_distance = 35
+var attack_move_speed = 4.5
+export (float) var mouse_sense = 0.1
+# Dodge
+export var double_press_time: float = 0.4
+var dash_countback: int = 0
+var dash_timerback: float = 0.0
+# Dodge Left
+var dash_countleft: int = 0
+var dash_timerleft: float = 0.0
+# Dodge right
+var dash_countright: int = 0
+var dash_timerright: float = 0.0
+# Dodge forward
+var dash_countforward: int = 0
+var dash_timerforward: float = 0.0
+# Dodge multidirection (not in strafe mode)
+var dash_count1 : int = 0
+var dash_timer1 : float = 0.0
+var dash_count2 : int = 0
+var dash_timer2 : float = 0.0
+# Condition States
+var enabled_climbing = true
+var is_riding = bool()
+var is_falling = bool()
+var is_swimming =bool()
+var is_rolling = bool()
+var is_walking = false
+var was_walking = false
+var is_running = bool()
+var is_sprinting = bool()
+var is_aiming = bool()
+var is_cursor = false
+var is_crouching = bool()
+var attacking = bool()
+var is_sliding = false
+var is_guarding = false
+var is_climbing = false
+var mousemode = bool()
+var staggered = false
+var blocking = false
+var backstep = bool()
+var frontstep = bool()
+var leftstep = bool()
+var rightstep =bool()
+var stunned = false
+var injured = false
+# Physics values
+var direction = Vector3()
+var horizontal_velocity = Vector3()
+var aim_turn = float()
+var movement = Vector3()
+var vertical_velocity = Vector3()
+var movement_speed = int()
+var angular_acceleration = int()
+var acceleration = int()
+#preloads and loads  for UI
+onready var tool_tip = load("res://player/UI/HoverText/Test.tscn")
+#Save data
+const SAVE_DIR = "user://saves/"
+var save_path = SAVE_DIR + "save.dat"
+
+#_________________________________________States and Attributes_______________________________________
+var level = 0
+var entity_name = "Cei"
+#crude stats
+var health = 100
+const base_health = 100
+var max_health = 100
+const base_max_health = 100
+var energy = 100
+var max_energy = 100
+const base_max_energy = 100
+var resolve = 100
+var max_resolve = 100
+const base_max_resolve = 100
+
+const base_weight = 60
+var weight = 60
+const base_walk_speed = 3
+var walk_speed = 3 
+const base_run_speed = 6
+var run_speed = 6
+const base_climb_speed = 1.5 
+var climb_speed = 1.5
+const base_crouch_speed = 2
+var crouch_speed = 2
+const base_jumping_power = 5 
+var jumping_power = 5
+const base_dash_power = 12
+var dash_power = 12
+var attribute = 100000000
+var spent_attribute_points = 0
+var defense =  10
+var coordination = 1
+
+var creativity = 1
+var wisdom = 1
+var memory = 1
+var intelligence = 1
+var willpower = 1
+
+var power = 1
+var strength = 1.5
+var impact = 1
+var resistance = 1
+var tenacity = 1
+
+var accuracy = 1
+var dexterity = 1
+
+var balance = 1
+var focus = 1
+
+var acrobatics = 1
+var agility = 1
+var athletics = 1
+var flexibility = 1
+var placeholder_ = 1
+
+var endurance = 1
+var stamina = 1
+var vitality = 1
+var vigor = 1
+var recovery = 1
+
+var charisma = 1
+var loyalty = 1 
+var diplomacy = 1
+var leadership = 1
+var empathy = 1
+
+
+
+#Leveling compounding attributes 
+var spent_attribute_points_cre = 0
+var spent_attribute_points_wis = 0
+var spent_attribute_points_mem = 0
+var spent_attribute_points_int = 0
+var spent_attribute_points_wil = 0
+
+var spent_attribute_points_pow = 0
+var spent_attribute_points_str = 0
+var spent_attribute_points_imp = 0
+var spent_attribute_points_res = 0
+var spent_attribute_points_ten = 0
+
+var spent_attribute_points_acc = 0
+var spent_attribute_points_dex = 0
+
+var spent_attribute_points_bal = 0
+var spent_attribute_points_foc = 0
+
+var spent_attribute_points_acr = 0
+var spent_attribute_points_agi = 0
+var spent_attribute_points_ath = 0
+var spent_attribute_points_fle = 0
+#var placeholder_
+
+var spent_attribute_points_end = 0
+var spent_attribute_points_sta = 0
+var spent_attribute_points_vit = 0
+var spent_attribute_points_vig = 0
+var spent_attribute_points_rec = 0
+
+var spent_attribute_points_cha = 0
+var spent_attribute_points_loy = 0 
+var spent_attribute_points_dip = 0
+var spent_attribute_points_lea = 0
+var spent_attribute_points_emp = 0
+
+
+#_______stored______
+var st_charisma = charisma
+var st_loyalty =  loyalty
+var st_diplomacy = diplomacy
+var st_leadership = leadership
+var st_empathy = empathy
+
+var st_accuracy = accuracy
+var st_dexterity = dexterity
+var st_coordination = coordination
+var st_balance = balance
+var st_focus = focus
+
+var st_endurance = endurance
+var st_stamina = stamina
+var st_vitality = vitality
+var st_vigor = vigor
+var st_recovery = recovery
+
+var st_acrobatics = acrobatics
+var st_agility = agility
+var st_athletics = athletics
+var st_flexibility = flexibility
+var st_placeholder = placeholder_
+
+
+var st_power = power
+var st_strength = strength
+var st_impact = impact
+var st_resistance = resistance
+var st_tenacity = tenacity
+
+var st_creativity = creativity
+var st_wisdom = wisdom
+var st_memory = memory
+var st_intelligence = intelligence
+var st_willpower = willpower
+
+	
+
+
+		
+func _ready():	
+	loadPlayerData()
+	# Load the tooltip scene
+	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	direction = Vector3.BACK.rotated(Vector3.UP,  camera_h.global_transform.basis.get_euler().y)
+func _input(event):
+	if event is InputEventKey:
+		if event.scancode == KEY_P:  # Replace with the desired key code
+			resetSavedData()
+	if event is InputEventMouseMotion:
+
+		camrot_h += -event.relative.x * h_sensitivity
+		camrot_v += event.relative.y * v_sensitivity
+func _physics_process(delta):
+	if not stunned:
+			jump()
+			dodgeBack(delta)
+			dodgeFront(delta)
+			dodgeLeft(delta)
+			dodgeRight(delta)	
+			movement()
+			climbing()
+			teleport()
+			gliding()
+	mouseMode()		
+	stiffCamera(delta)	
+	ridingCollision()
+	Gravity()
+	interpol(delta)
+	debug()
+	debugText()	
+	animationsAll(delta)
+	cameraRotation(delta)
+
+#__________________________________________Movement_________________________________
+func movement():
+	var h_rot =  camera_h.global_transform.basis.get_euler().y
+	movement_speed = 0
+	angular_acceleration = 10
+	acceleration = 15
+# Movement and strafe
+	if Input.is_action_pressed("forward") or Input.is_action_pressed("backward") or Input.is_action_pressed("left") or Input.is_action_pressed("right"):
+		direction = Vector3(Input.get_action_strength("left") - Input.get_action_strength("right"),
+					0,
+					Input.get_action_strength("forward") - Input.get_action_strength("backward"))
+		direction = direction.rotated(Vector3.UP, h_rot).normalized()
+		is_walking = true
+		# Movement States
+		if Input.is_action_pressed("run") and is_walking and not is_climbing and not blocking and not is_swimming:
+			movement_speed = run_speed
+			is_running = true
+			enabled_climbing = false
+			is_crouching = false
+
+			is_aiming = false
+		elif Input.is_action_pressed("crouch") and is_walking and !is_climbing and !is_swimming:
+			movement_speed = crouch_speed
+			is_running = false
+			enabled_climbing = false
+			is_crouching = true
+			is_aiming = false
+		#Computer
+		elif Input.is_action_pressed("sprint") and is_walking and not is_climbing and not blocking and not is_swimming:
+				movement_speed = sprint_speed
+				is_sprinting = true
+				enabled_climbing = false
+				is_crouching = false
+				is_aiming = false
+		else:  # Walk State and speed
+			movement_speed = walk_speed
+			is_sprinting = false
+			is_crouching = false
+			enabled_climbing = true
+			is_crouching = false
+	else:
+		is_walking = false
+		is_running = false
+		is_sprinting = false
+		is_crouching = false
+		is_crouching = false
+	movement.z = horizontal_velocity.z + vertical_velocity.z
+	movement.x = horizontal_velocity.x + vertical_velocity.x
+	movement.y = vertical_velocity.y
+	move_and_slide(movement, Vector3.UP)
+func dodgeBack(delta):#Doddge when in strafe mode
+		if dash_countback > 0:
+			dash_timerback += delta
+		if dash_timerback >= double_press_time:
+			dash_countback = 0
+			dash_timerback = 0.0
+		if Input.is_action_just_pressed("backward"):
+			dash_countback += 1
+		if dash_countback == 2 and dash_timerback < double_press_time:
+			horizontal_velocity = direction * dash_power
+			backstep = true
+
+			enabled_climbing = false
+		else:
+			enabled_climbing = true
+			backstep = false
+func dodgeFront(delta):#Dodge when in strafe mode
+		if dash_countforward > 0:
+			dash_timerforward += delta
+		if dash_timerforward >= double_press_time:
+			dash_countforward = 0
+			dash_timerforward = 0.0
+		if Input.is_action_just_pressed("forward"):
+			dash_countforward += 1
+		if dash_countforward == 2 and dash_timerforward < double_press_time:
+			horizontal_velocity = direction * dash_power *1.5
+			frontstep = true
+			enabled_climbing = false
+		else:
+
+			enabled_climbing = true
+			frontstep = false
+func dodgeLeft(delta):#Dodge when in strafe mode
+		if dash_countleft > 0:
+			dash_timerleft += delta
+		if dash_timerleft >= double_press_time:
+			dash_countleft = 0
+			dash_timerleft = 0.0
+		if Input.is_action_just_pressed("left"):
+			dash_countleft += 1
+		if dash_countleft == 2 and dash_timerleft < double_press_time:
+			horizontal_velocity = direction * dash_power
+			enabled_climbing = false
+			leftstep = true
+		else:
+			enabled_climbing = true
+			leftstep = false
+func dodgeRight(delta):#Dodge when in strafe mode
+		if dash_countright > 0:
+			dash_timerright += delta
+		if dash_timerright >= double_press_time:
+			dash_countright = 0
+			dash_timerright = 0.0
+		if Input.is_action_just_pressed("right"):
+			dash_countright += 1
+		if dash_countright == 2 and dash_timerright < double_press_time :
+			horizontal_velocity = direction * dash_power
+			enabled_climbing = false
+			rightstep = true
+		else:
+			enabled_climbing = true
+			rightstep = false
+func teleport():
+	if Input.is_action_just_pressed("teleport"):
+		vertical_velocity = Vector3.UP * jump_force * 4
+		var teleport_vector = direction.normalized() * teleport_distance
+		var teleport_position = translation + teleport_vector
+		var collision = move_and_collide(teleport_vector)
+		if collision:
+			teleport_position = collision.position
+			translation = teleport_position
+func climbing():
+	if is_on_wall():
+		if  Input.is_action_pressed("ui_accept"):
+				vertical_velocity = Vector3.UP * climb_speed 
+				horizontal_velocity = direction * climb_speed
+				is_climbing = true
+				is_swimming = false
+	else:
+			is_climbing = false
+func jump():
+	if Input.is_action_pressed("ui_accept") and is_on_floor():
+		vertical_velocity = Vector3.UP * jump_force * 3
+	if Input.is_action_pressed("ui_accept") and is_swimming:
+		vertical_velocity = Vector3.UP * 5
+func gliding():
+	if is_falling:
+		if Input.is_action_pressed("glide"):
+			vertical_velocity = Vector3.ZERO  # No vertical movement while gliding
+			movement_speed =  walk_speed		
+func interpol(delta):
+	horizontal_velocity = horizontal_velocity.linear_interpolate(direction.normalized() * movement_speed, acceleration * delta)
+func Gravity():
+	# Gravity and stop sliding on floors
+	if not is_on_floor() and not is_swimming:
+		vertical_velocity += Vector3.DOWN * 2.5
+		is_falling = true
+		is_swimming = false
+	else:
+		vertical_velocity = -get_floor_normal() * gravity / 2.5
+		is_falling = false		
+#___________________________________________Camera_______________________________________________
+func cameraRotation(delta):
+		camrot_v = clamp(camrot_v, cam_v_min, cam_v_max)
+		#MOUSE CAMERA
+		camera_h.rotation_degrees.y = lerp(camera_h.rotation_degrees.y, camrot_h, delta * h_acceleration)
+		camera_v.rotation_degrees.x = lerp(camera_v.rotation_degrees.x, camrot_v, delta * v_acceleration)
+func mouseMode():
+	if Input.is_action_pressed("aim"):
+		is_aiming = true
+	else:
+		is_aiming = false	
+	if Input.is_action_just_pressed("ui_cancel"):	# Toggle mouse mode
+		if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+			is_cursor = true
+		else:
+			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+			is_cursor = false
+func stiffCamera(delta):
+		if is_aiming:
+			player_mesh.rotation.y = lerp_angle(player_mesh.rotation.y, camera_h.rotation.y, delta * angular_acceleration)
+		else:
+			player_mesh.rotation.y = lerp_angle(player_mesh.rotation.y, atan2(direction.x, direction.z) - rotation.y, delta * angular_acceleration)	
+#_______________________________________Collisions__________________________________
+func ridingCollision():
+	if has_ride:
+		# If has_horse is true, change collision layers
+		set_collision_layer(6)  # Set to the desired collision layer
+		set_collision_mask(6)   # Set to the desired collision mask
+	elif not has_ride:
+		# If has_horse is false, reset collision layers
+		set_collision_layer(1)  # Set to the original collision layer
+		set_collision_mask(1)   # Set to the original collision mask
+#__________________________________Animation Section_____________________________________
+func animationsAll(delta):
+	if is_in_combat:
+		if barehanded_mode:
+			animationsBarehanded()	
+		elif one_handed_sword_mode:
+			animations1HSword()	
+		elif two_handed_sword_mode:
+			animations2HSword()
+		elif duel_wield_mode:
+			animationsDualWield()		
+		elif bow_mode:
+			animationsBow()	
+		elif sword_and_shield_mode:
+			animationsSwordAndShield(delta)	
+	else:
+		if is_aiming:
+			animationStrafe()
+		else:
+			animationOutOfCombat()	
+#____________________________________Sword and Shield Animations_______________________________________
+func animationsSwordAndShield(delta):
+	if Input.is_action_pressed("aim"): #block
+		if  dash_countforward ==2:
+			an.play("slide",blend)
+		elif  dash_countleft ==2:
+			an.play_backwards("dodge right",blend)
+		elif  dash_countright ==2:
+			an.play("dodge right",blend)
+		elif  dash_countback ==2:
+			an.play_backwards("backstep",blend)
+		elif Input.is_action_pressed("attack"):
+			an.play("pomel strike",blend)#placeholder counter attack
+			horizontal_velocity = Vector3.ZERO
+		elif Input.is_action_pressed("forward") and Input.is_action_pressed("left"):
+			an.play("left front sword and shield block",blend)
+		elif Input.is_action_pressed("backward") and Input.is_action_pressed("left"):
+			an.play_backwards("right front sword and shield block",blend)
+		elif Input.is_action_pressed("backward") and Input.is_action_pressed("right"):
+			an.play_backwards("left front sword and shield block",blend)
+		elif Input.is_action_pressed("forward") and Input.is_action_pressed("right"):
+			an.play("right front sword and shield block", blend)
+		elif Input.is_action_pressed("backward"):
+			an.play_backwards("walk sword and shield block ",blend)
+		elif Input.is_action_pressed("left"):
+			an.play("left sword and shield block",blend)
+		elif Input.is_action_pressed("right"):
+			an.play("right sword and shield block",blend)
+		elif Input.is_action_pressed("forward"):
+			an.play("walk sword and shield block ",blend)
+		else:
+			an.play("block shield",blend/2)	
+	else:
+		if dash_countback ==2 or dash_countleft ==2 or dash_countright ==2 or dash_countforward ==2:
+			an.play("slide",blend)
+
+		elif Input.is_action_pressed("E"):
+			an.play("fury strike cycle", blend +0.1)
+			moveAttack2(delta)
+		elif Input.is_action_pressed("attack"):
+			an.play("combo attack sword and shield cycle")
+			moveAttack(delta)
+		elif is_sliding and attacking:
+			an.play("swirl melee attack")
+		elif is_walking:
+			an.play("walk dual wield")		
+		else:
+			an.play("idle combat")
+#_________________________________________One handed Sword animations_____________________________________________
+func animations1HSword():
+	if Input.is_action_pressed("attack"):
+		an.play("combo attack 1h")
+
+	elif is_walking:
+		if not injured:
+			an.play("walk")
+		else:
+			an.play("walk injured")
+	elif is_crouching:
+		if is_running:
+			an.play("sneak run")
+		elif is_walking:
+			an.play("sneak walk")
+		else:
+			an.play("sneak")
+	elif is_climbing:
+		an.play("climb")
+	elif is_swimming:
+		an.play("swim")
+	else:
+		an.play("idle combat")
+#_____________________________________________Two handed Sword_____________________________________
+func animations2HSword():
+	if Input.is_action_pressed("attack"):
+		an.play("combo attack 2h")
+
+	elif is_walking:
+		if not injured:
+			an.play("walk")
+		else:
+			an.play("walk injured")
+	elif is_crouching:
+		if is_running:
+			an.play("sneak run")
+		elif is_walking:
+			an.play("sneak walk")
+		else:
+			an.play("sneak")
+	elif is_climbing:
+		an.play("climb")
+	elif is_swimming:
+		an.play("swim")	
+	else:
+		an.play("idle combat 2h", blend)
+#_____________________________________________Dual Wielding______________________________________________
+func animationsDualWield():
+	if Input.is_action_pressed("attack"):
+		an.play("combo attack 2w2v", blend)
+
+	elif is_walking:
+		if not injured:
+			an.play("walk")
+		else:
+			an.play("walk injured")
+	elif is_crouching:
+		if is_running:
+			an.play("sneak run")
+		elif is_walking:
+			an.play("sneak walk")
+		else:
+			an.play("sneak")
+	elif is_climbing:
+		an.play("climb")
+	elif is_swimming:
+		an.play("swim")	
+	else:
+		an.play("idle combat 2h", blend)
+#__________________________________________Bow______________________________________
+func animationsBow():
+	if Input.is_action_pressed("attack") and is_walking and not is_aiming:
+		an.play("shoot forward", blend)
+	elif Input.is_action_pressed("attack") and is_aiming and Input.is_action_pressed("left"):
+		an.play("shoot left", blend)
+	elif Input.is_action_pressed("attack") and is_aiming and Input.is_action_pressed("right"):
+		an.play("shoot right", blend)
+	elif Input.is_action_pressed("attack") and is_aiming and Input.is_action_pressed("left"):
+		an.play("shoot back", blend)
+	elif Input.is_action_pressed("attack") and is_walking :
+		an.play("shoot forward", blend)
+	elif Input.is_action_pressed("attack"):
+		an.play("shoot arrow", blend)
+	elif is_walking:
+		if not injured:
+			an.play("walk")
+		else:
+			an.play("walk injured")
+	elif is_crouching:
+		if is_running:
+			an.play("sneak run")
+		elif is_walking:
+			an.play("sneak walk")
+		else:
+			an.play("sneak")
+	elif is_climbing:
+		an.play("climb")
+	elif is_swimming:
+		an.play("swim")	
+	else:
+		an.play("idle combat", blend)
+#___________________________________________Empty Handed_____________________________________________
+func animationsBarehanded():
+	if Input.is_action_pressed("attack"):
+		an.play("kick")	
+	elif is_walking:
+		if not injured:
+			an.play("walk")
+		else:
+			an.play("walk injured")
+	elif is_crouching:
+		if is_running:
+			an.play("sneak run")
+		elif is_walking:
+			an.play("sneak walk")
+		else:
+			an.play("sneak")
+	elif is_climbing:
+		an.play("climb")
+	elif is_swimming:
+		an.play("swim")
+	elif Input.is_action_just_pressed("ui_accept"):
+		an.play_backwards("landing")
+	else:
+		an.play("idle combat")
+#____________________________________________Out of Combat_________________________________
+func animationOutOfCombat(): #normal
+	#dodge section is prioritized
+	if dash_countback ==2 or dash_countleft ==2 or dash_countright ==2 or dash_countforward ==2 or is_sliding:
+		an.play("slide",blend)
+#out of combat normal movement
+	elif !is_in_combat and !is_swimming and is_on_floor() and !is_aiming:
+		if is_sprinting:
+			an.play("run")
+		elif is_running:
+			an.play("run")
+		elif is_walking and Input.is_action_pressed("crouch"):
+			an.play("sneak walk")
+		elif is_running and Input.is_action_pressed("crouch"):
+			an.play("sneak run")
+		elif is_walking:
+			an.play("walk")
+		elif Input.is_action_pressed("crouch"):
+			an.play("sneak",blend)
+		else:
+			an.play("idle", 0.25)
+func animationStrafe(): #strafe
+	#dodge section is prioritized
+		if dash_countback ==2:
+			an.play("backstep",blend)
+		elif dash_countleft ==2:
+			an.play("TPose",blend)
+		elif dash_countright ==2:
+			an.play("TPose",blend)
+		elif dash_countforward ==2:
+			an.play_backwards("backstep",blend)
+	#strafing walk 
+		elif Input.is_action_pressed("forward") and Input.is_action_pressed("left"):
+			an.play("left front",blend)
+		elif Input.is_action_pressed("backward") and Input.is_action_pressed("left"):
+			an.play_backwards("right front",blend)
+		elif Input.is_action_pressed("backward") and Input.is_action_pressed("right"):
+			an.play_backwards("left front",blend)
+		elif Input.is_action_pressed("forward") and Input.is_action_pressed("right"):
+			an.play("right front", blend)
+		elif Input.is_action_pressed("backward"):
+			an.play_backwards("walk",blend)
+		elif Input.is_action_pressed("left"):
+			an.play("left",blend)
+		elif Input.is_action_pressed("right"):
+			an.play("right",blend)
+		elif Input.is_action_pressed("forward"):
+			an.play("walk")
+		elif Input.is_action_just_pressed("ui_accept"):
+			an.play_backwards("landing")
+		else:
+			an.play("idle",blend)
+#_____________________________________________Debugger_________________________
+func debug():
+	if Input.is_action_just_pressed("test1"):
+		duel_wield_mode = false
+		bow_mode = false
+		two_handed_sword_mode = false
+		one_handed_sword_mode = false
+		sword_and_shield_mode = false
+		crossbow_mode = false
+		magic_staff_mode = false
+		barehanded_mode = true
+	elif Input.is_action_just_pressed("test2"):
+		duel_wield_mode = false
+		bow_mode = false
+		two_handed_sword_mode = false
+		one_handed_sword_mode = true
+		sword_and_shield_mode = false
+		crossbow_mode = false
+		magic_staff_mode = false
+		barehanded_mode = false		
+	elif Input.is_action_just_pressed("test3"):	
+		$"Mesh/Armature020/Skeleton/sword long".visible = false
+		$"Mesh/Armature020/Skeleton/sword long001".visible = false
+		$Mesh/Armature020/Skeleton/bow.visible = true
+		$Mesh/Armature020/Skeleton/shield.visible = false 		
+		duel_wield_mode = false
+		bow_mode = true
+		two_handed_sword_mode = false
+		one_handed_sword_mode = false
+		sword_and_shield_mode = false
+		crossbow_mode = false
+		magic_staff_mode = false
+		barehanded_mode = false		
+	elif Input.is_action_just_pressed("test4"):
+		$"Mesh/Armature020/Skeleton/sword long".visible = true 
+		$"Mesh/Armature020/Skeleton/sword long001".visible = false
+		$Mesh/Armature020/Skeleton/bow.visible = false 
+		$Mesh/Armature020/Skeleton/shield.visible = false 
+		duel_wield_mode = false
+		bow_mode = false
+		two_handed_sword_mode = true
+		one_handed_sword_mode = false
+		sword_and_shield_mode = false
+		crossbow_mode = false
+		magic_staff_mode = false
+		barehanded_mode = false
+	elif Input.is_action_just_pressed("test5"):
+		$"Mesh/Armature020/Skeleton/sword long".visible = true 
+		$"Mesh/Armature020/Skeleton/sword long001".visible = true 
+		$Mesh/Armature020/Skeleton/bow.visible = false 
+		$Mesh/Armature020/Skeleton/shield.visible = false 
+		duel_wield_mode = true
+		bow_mode = false
+		two_handed_sword_mode = false
+		one_handed_sword_mode = false
+		sword_and_shield_mode = false
+		crossbow_mode = false
+		magic_staff_mode = false
+		barehanded_mode = false
+	elif Input.is_action_just_pressed("test6"):
+		$"Mesh/Armature020/Skeleton/sword long".visible = true 
+		$"Mesh/Armature020/Skeleton/sword long001".visible = false
+		$Mesh/Armature020/Skeleton/bow.visible = false 
+		$Mesh/Armature020/Skeleton/shield.visible = true
+		duel_wield_mode = false
+		bow_mode = false
+		two_handed_sword_mode = false
+		one_handed_sword_mode = false
+		sword_and_shield_mode = true
+		crossbow_mode = false
+		magic_staff_mode = false
+		barehanded_mode = false
+	elif Input.is_action_just_pressed("test9"):
+		OS.window_fullscreen = !OS.window_fullscreen
+	elif Input.is_action_just_pressed("test0"):
+		is_in_combat = !is_in_combat
+	elif Input.is_action_just_pressed("skills"):	
+		$AllUIHere/Skills.visible = !$AllUIHere/Skills/.visible
+#Combat Stufff
+func moveAttack(delta):
+	if can_move:
+		horizontal_velocity = direction * 40 * delta
+	else:
+		horizontal_velocity = direction * 10.35 * delta
+func moveAttack2(delta):
+	if can_move:
+		horizontal_velocity = direction * 100 * delta
+	else:
+		horizontal_velocity = direction * 0.35 * delta
+func stop():
+	can_move = false
+func start():
+	can_move = true 
+#________________________________________Graphic User Interface____________________________________
+func debugText():
+	var rich_text_label = $AllUIHere/CanvasLayer/Debugger
+	rich_text_label.text = "Memory: %.3f MB" % (OS.get_static_memory_usage() / (1024.0 * 1024.0))
+	rich_text_label.text += "\nPosition: (%.1f, %.1f, %.1f)" % [global_transform.origin.x,global_transform.origin.y,global_transform.origin.z]
+	rich_text_label.text += "\nFPS: %d" % Engine.get_frames_per_second()
+func _on_TextureButton_mouse_entered():
+	var tool_tip_instance = tool_tip.instance()
+# Set the position of the tool_tip_instance to the right of the TextureButton
+	tool_tip_instance.rect_position.x = $AllUIHere/Skills/WardenSkills/TextureButton.rect_size.x + 10  # Adjust 10 as needed
+	tool_tip_instance.rect_position.y = $AllUIHere/Skills/WardenSkills/TextureButton.rect_position.y  # Maintain the same height	
+	$AllUIHere/Skills/WardenSkills/TextureButton.add_child(tool_tip_instance)
+	
+func _on_TextureButton_mouse_exited():
+	# Remove all children from the TextureButton
+	for child in $AllUIHere/Skills/WardenSkills/TextureButton.get_children():
+		child.queue_free()
+func _on_WardenSkillsButton_pressed():
+	$AllUIHere/Skills/WardenSkills.visible = true
+func _on_TextureButton_pressed():
+	print("pressed")
+#_______________________________________________Save Data__________________________________________
+
+func savePlayerData():
+	var data = {
+		"position": translation,
+		"rotation": player_mesh.rotation_degrees,
+#camera stuff
+		"H_rotation": camera_h.rotation_degrees,
+		"V_rotation": camera_v.rotation_degrees,
+		"camera_position": camera.translation,
+		"camera_rotation": camera.rotation_degrees,  # Save the camera's rotation		
+#Attributes		
+#leveling 
+		"attribute": attribute,
+		"spent_attribute_points_int": spent_attribute_points_int,
+		"spent_attribute_points_wis": spent_attribute_points_wis,
+		"spent_attribute_points_cha": spent_attribute_points_cha,
+		"spent_attribute_points_vit": spent_attribute_points_vit,
+		
+#Brain attributes
+		"creativity": creativity,
+		"wisdom" : wisdom,
+		"memory": memory,
+		"intelligence": intelligence,
+		"willpower": willpower,
+
+#Brute attributes
+		"power": power,
+		"strength": strength,
+		"impact": impact,
+		"resistance": resistance,
+		"tenacity": tenacity,
+
+#Precision attributes
+		"accuracy": accuracy,
+		"dexterity":dexterity,
+		"coordination": coordination,
+		"balance": balance,
+		"focus": focus,
+
+#Nimble attributes
+		"acrobatics": acrobatics,
+		"agility": agility,
+		"athletics": athletics,
+		"flexibility": flexibility,
+		"placeholder_": placeholder_,
+
+#Toughness attributes
+		"endurance": endurance,
+		"stamina": stamina,
+		"vitality": vitality,
+		"vigor": vigor,
+		"recovery": recovery,
+
+#Social attributes 
+		"charisma":charisma,
+		"loyalty": loyalty,
+		"diplomacy": diplomacy,
+		"leadership": leadership,
+		"empathy": empathy,
+
+#crude stats
+		"health": health,
+		"energy":energy,
+		"resolve": resolve,
+		"max_health": max_health,
+		"max_energy": max_energy,
+		"max_resolve": max_resolve,
+#hair   
+		#"hair0":has_hair0,
+		#"hair1": has_hair1,
+		#"hair2": has_hair2,
+		#"hair3": has_hair3,
+		#"hair_color": hair_color,
+#skin 
+		#"skin0": skin0,
+		#"skin1": skin1,
+		#"skin2": skin2,
+		#"skin3": skin3,
+	
+		}
+
+	var dir = Directory.new()
+	if !dir.dir_exists(SAVE_DIR):
+		dir.make_dir_recursive(SAVE_DIR)
+
+	var file = File.new()
+	var error = file.open_encrypted_with_pass(save_path, File.WRITE, "P@paB3ar6969")
+	if error == OK:
+		file.store_var(data)
+		file.close()
+
+func loadPlayerData():
+	var file = File.new()
+	if file.file_exists(save_path):
+		var error = file.open_encrypted_with_pass(save_path, File.READ, "P@paB3ar6969")
+		if error == OK:
+			var player_data = file.get_var()
+			file.close()
+
+			if "position" in player_data:
+				translation = player_data["position"]
+			if "rotation" in player_data:
+				rotation_degrees = player_data["rotation"]
+#attributes 
+			if "attribute" in player_data:
+				attribute = player_data["attribute"]
+			if "spent_attribute_points_int" in player_data:
+				spent_attribute_points_int = player_data["spent_attribute_points_int"]
+			if "spent_attribute_points_cha" in player_data:
+				spent_attribute_points_cha = player_data["spent_attribute_points_cha"]
+			if "spent_attribute_points_wis" in player_data:
+				spent_attribute_points_wis = player_data["spent_attribute_points_wis"]
+			if "spent_attribute_points_vit" in player_data:
+				spent_attribute_points_vit = player_data["spent_attribute_points_vit"]
+#Brute attributes
+			if "power" in player_data:
+				power = player_data["power"]
+			if "strength" in player_data:
+				strength = player_data["strength"]				
+			if "impact" in player_data:
+				impact = player_data["impact"]				
+			if "resistance" in player_data:
+				resistance = player_data["resistance"]
+			if "tenacity" in player_data:
+				tenacity = player_data["tenacity"]
+#Brain attributes
+			if "creativity" in player_data:
+				creativity = player_data["creativity"]
+			if "wisdom" in player_data:
+				wisdom = player_data["wisdom"]
+			if "memory" in player_data:
+				memory = player_data["memory"]				
+			if "intelligence" in player_data:
+				intelligence = player_data["intelligence"]				
+			if "willpower" in player_data:
+				willpower = player_data["willpower"]
+#Precision attributes
+			if 	"accuracy" in player_data:
+				 accuracy = player_data["accuracy"]
+			if "dexterity" in player_data:
+				dexterity = player_data["dexterity"]
+			if "cooridnation" in player_data:
+				coordination = player_data["cooridnation"]								
+			if "balance" in player_data:
+				balance = player_data["balance"]
+			if "focus" in player_data:
+				focus  = player_data["focus"]
+#Nimble attributes
+			if "acrobatics" in player_data:
+				 acrobatics = player_data["accuracy"]
+			if "agility" in player_data:
+				 agility = player_data["agility"]
+			if "flexibility" in player_data:
+				flexibility = player_data["flexibility"]
+			if "athletics" in player_data:
+				athletics = player_data["athletics"]				
+#Toughness attributes
+			if "endurance" in player_data:
+				dexterity = player_data["endurance"] 
+			if "stamina" in player_data:
+				stamina = player_data["stamina"]
+			if "vitality" in player_data:
+				vitality = player_data["vitality"]
+			if "vigor" in player_data:
+				vigor = player_data["vigor"]
+			if "recovery" in player_data:
+				recovery = player_data["recovery"]
+#Social attributes 
+			if "charisma" in player_data:
+				charisma = player_data["charisma"]
+			if "loyalty" in player_data:
+				loyalty = player_data["loyalty"]
+			if "diplomacy" in player_data:
+				diplomacy = player_data["diplomacy"]
+			if "leadership" in player_data:
+				leadership = player_data["leadership"]
+			if "empathy" in player_data:
+				empathy = player_data["empathy"]
+#crude stats 				
+			if "health" in player_data:
+				health = player_data["health"]
+			if "max_health" in player_data:
+				max_health = player_data["max_health"]				
+			if "energy" in player_data:
+				energy = player_data["energy"]
+			if "max_energy" in player_data:
+				max_energy = player_data["max_energy"]
+			if "resolve" in player_data:
+				resolve = player_data["resolve"]
+			if "max_resolve" in player_data:
+				max_resolve = player_data["max_resolve"]
+#hair				
+		#	if "hair0" in player_data:
+			#	has_hair0 = player_data["hair0"]
+			#if "hair1" in player_data:
+			#	has_hair1 = player_data["hair1"]
+			#if "hair2" in player_data:
+			#	has_hair2 = player_data["hair2"]
+			#if "hair3" in player_data:
+			#	has_hair3 = player_data["hair3"]
+			#if "hair_color"	 in player_data:
+			#	hair_color = player_data["hair_color"]
+#skin 
+		#	if "skin0" in player_data:
+		#		skin.skin0 = player_data["skin0"]
+			#if "skin1" in player_data:
+		#		skin.skin1 = player_data["skin1"]
+		#	if "skin2" in player_data:
+			#	skin.skin2 = player_data["skin2"]
+		#	if "skin3" in player_data:
+			#	skin.skin3 = player_data["skin3"]
+func resetSavedData():
+	var dir = Directory.new()
+	if dir.file_exists(save_path):
+		dir.remove(save_path)
+		print("Saved data reset")
+
+
+
+func console_write(value):
+	print(str(value))
+
+
+
+
+func _on_SaveDataTimer_timeout():
+	savePlayerData()
