@@ -93,11 +93,14 @@ var angular_acceleration = int()
 var acceleration = int()
 #preloads and loads  for UI
 onready var tool_tip = load("res://player/UI/HoverText/Test.tscn")
+#other UI stuff 
+onready var all_ui = $AllUIHere
+onready var warden_skill_ui = $AllUIHere/Skills/WardenSkills
+onready var debugger =$AllUIHere/CanvasLayer/Debugger
 #Save data
 const SAVE_DIR = "user://saves/"
 var save_path = SAVE_DIR + "save.dat"
-
-#_________________________________________States and Attributes_______________________________________
+#_________________________________________States and Attributes_____________________________________
 var level = 0
 var entity_name = "Cei"
 #crude stats
@@ -166,9 +169,6 @@ var loyalty = 1
 var diplomacy = 1
 var leadership = 1
 var empathy = 1
-
-
-
 #Leveling compounding attributes 
 var spent_attribute_points_cre = 0
 var spent_attribute_points_wis = 0
@@ -205,8 +205,6 @@ var spent_attribute_points_loy = 0
 var spent_attribute_points_dip = 0
 var spent_attribute_points_lea = 0
 var spent_attribute_points_emp = 0
-
-
 #_______stored______
 var st_charisma = charisma
 var st_loyalty =  loyalty
@@ -232,7 +230,6 @@ var st_athletics = athletics
 var st_flexibility = flexibility
 var st_placeholder = placeholder_
 
-
 var st_power = power
 var st_strength = strength
 var st_impact = impact
@@ -245,10 +242,7 @@ var st_memory = memory
 var st_intelligence = intelligence
 var st_willpower = willpower
 
-	
 
-
-		
 func _ready():	
 	loadPlayerData()
 	# Load the tooltip scene
@@ -436,6 +430,7 @@ func Gravity():
 		is_falling = false		
 #___________________________________________Camera_______________________________________________
 func cameraRotation(delta):
+	if not is_cursor:
 		camrot_v = clamp(camrot_v, cam_v_min, cam_v_max)
 		#MOUSE CAMERA
 		camera_h.rotation_degrees.y = lerp(camera_h.rotation_degrees.y, camrot_h, delta * h_acceleration)
@@ -807,25 +802,28 @@ func start():
 	can_move = true 
 #________________________________________Graphic User Interface____________________________________
 func debugText():
-	var rich_text_label = $AllUIHere/CanvasLayer/Debugger
-	rich_text_label.text = "Memory: %.3f MB" % (OS.get_static_memory_usage() / (1024.0 * 1024.0))
-	rich_text_label.text += "\nPosition: (%.1f, %.1f, %.1f)" % [global_transform.origin.x,global_transform.origin.y,global_transform.origin.z]
-	rich_text_label.text += "\nFPS: %d" % Engine.get_frames_per_second()
-func _on_TextureButton_mouse_entered():
-	var tool_tip_instance = tool_tip.instance()
-# Set the position of the tool_tip_instance to the right of the TextureButton
-	tool_tip_instance.rect_position.x = $AllUIHere/Skills/WardenSkills/TextureButton.rect_size.x + 10  # Adjust 10 as needed
-	tool_tip_instance.rect_position.y = $AllUIHere/Skills/WardenSkills/TextureButton.rect_position.y  # Maintain the same height	
-	$AllUIHere/Skills/WardenSkills/TextureButton.add_child(tool_tip_instance)
-	
-func _on_TextureButton_mouse_exited():
-	# Remove all children from the TextureButton
-	for child in $AllUIHere/Skills/WardenSkills/TextureButton.get_children():
-		child.queue_free()
+	debugger.text = "Memory: %.3f MB" % (OS.get_static_memory_usage() / (1024.0 * 1024.0))
+	debugger.text += "\nPosition: (%.1f, %.1f, %.1f)" % [global_transform.origin.x,global_transform.origin.y,global_transform.origin.z]
+	debugger.text += "\nFPS: %d" % Engine.get_frames_per_second()
+#_________________________________________Warden Skills_____________________________________________
 func _on_WardenSkillsButton_pressed():
-	$AllUIHere/Skills/WardenSkills.visible = true
-func _on_TextureButton_pressed():
-	print("pressed")
+	warden_skill_ui.visible = true
+#_________________________________________skill 0____________________________________________________
+func _on_Skill0_mouse_entered():
+	var tool_tip_instance = tool_tip.instance()
+	var for_text = "Disarm:                                                     Disarm the enemy and decrease their strength and dexterity by 25% for 30 seconds "
+	add_child(tool_tip_instance)
+	tool_tip_instance._make_custom_tooltip(for_text)
+
+	
+func _on_Skill0_mouse_exited():
+	for child in get_children():
+		if child.is_in_group("Tooltip"):
+			child.queue_free()	
+func _on_Skill0_pressed():	
+	print("skill0pressed")
+func _on_skill1_pressed():
+	print("skill1pressed")
 #_______________________________________________Save Data__________________________________________
 
 func savePlayerData():
@@ -907,17 +905,14 @@ func savePlayerData():
 		#"skin3": skin3,
 	
 		}
-
 	var dir = Directory.new()
 	if !dir.dir_exists(SAVE_DIR):
 		dir.make_dir_recursive(SAVE_DIR)
-
 	var file = File.new()
 	var error = file.open_encrypted_with_pass(save_path, File.WRITE, "P@paB3ar6969")
 	if error == OK:
 		file.store_var(data)
 		file.close()
-
 func loadPlayerData():
 	var file = File.new()
 	if file.file_exists(save_path):
@@ -1043,14 +1038,5 @@ func resetSavedData():
 	if dir.file_exists(save_path):
 		dir.remove(save_path)
 		print("Saved data reset")
-
-
-
-func console_write(value):
-	print(str(value))
-
-
-
-
 func _on_SaveDataTimer_timeout():
 	savePlayerData()
