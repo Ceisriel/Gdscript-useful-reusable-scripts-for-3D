@@ -1,0 +1,41 @@
+extends Node
+
+onready var camera = $"../Camroot/h/v/Camera"
+var touch_start_position = Vector2.ZERO
+# You can adjust these variables to control the camera movement
+var zoom_speed = 0.1
+
+func _ready():
+	set_process_input(true)
+# Add this function to handle input events, including mouse wheel and touch events
+func _input(event):
+	if event is InputEventMouseButton and event.button_index == BUTTON_WHEEL_UP:
+		# Zoom in when scrolling up
+		Zoom(-1)
+	elif event is InputEventMouseButton and event.button_index == BUTTON_WHEEL_DOWN:
+		# Zoom out when scrolling down
+		Zoom(1)
+	
+	# Handle touch input for zooming
+	elif event is InputEventScreenTouch:
+		if event.pressed:
+			# Store the touch start position
+			touch_start_position = event.position
+		elif event.is_echo() and event.index == 0:
+			# Detect touch movement (echo for the first touch point)
+			touch_move(event)
+
+# Add this function to handle touch movement for zooming
+func touch_move(event):
+	# Calculate the touch movement speed based on the touch delta
+	var touch_delta = touch_start_position.y - event.position.y
+	# Update the touch start position for the next frame
+	touch_start_position = event.position
+	# Adjust the camera's position based on the touch movement
+	Zoom(touch_delta)
+
+# Add this function to handle zooming logic
+func Zoom(direction):
+	# Adjust the camera's position based on the zoom direction
+	camera.translation.y += direction * zoom_speed
+	camera.translation.z -= direction * zoom_speed
