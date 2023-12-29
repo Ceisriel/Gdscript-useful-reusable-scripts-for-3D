@@ -1,19 +1,4 @@
 extends KinematicBody
-#camera
-var camrot_h = 0
-var camrot_v = 0
-onready var parent = $".."
-export var cam_v_max = 75 # -75 recommended
-export var cam_v_min = -55 # -55 recommended
-onready var camera_v =$Camroot/h/v
-onready var camera_h =$Camroot/h
-onready var camera = $Camroot/h/v/Camera
-var h_sensitivity = .1
-var v_sensitivity = .1
-var rot_speed_multiplier = .15 #reduce this to make the rotation radius larger
-var h_acceleration = 10
-var v_acceleration = 10
-var mouse_captured = true
 #player rotation, animation and otherwise mostly visual stuff
 onready var player_mesh = get_node("Mesh")
 onready var an = $Mesh/AnimationPlayer
@@ -33,8 +18,8 @@ var has_ride = false
 # movement variables
 var velocity := Vector3()
 export var gravity = 9.8
-export var jump_force = 5
-export var sprint_speed = 14
+export var jump_force = 600
+export var sprint_speed = 20
 var teleport_distance = 35
 var attack_move_speed = 4.5
 export (float) var mouse_sense = 0.1
@@ -92,11 +77,11 @@ var movement_speed = int()
 var angular_acceleration = int()
 var acceleration = int()
 #preloads and loads  for UI
-onready var tool_tip = load("res://player/UI/HoverText/Test.tscn")
+#onready var tool_tip = load("res://player/UI/HoverText/Test.tscn")
 #other UI stuff 
-onready var all_ui = $AllUIHere
-onready var warden_skill_ui = $AllUIHere/Skills/WardenSkills
-onready var debugger =$AllUIHere/CanvasLayer/Debugger
+#onready var all_ui = $AllUIHere
+#onready var warden_skill_ui = $AllUIHere/Skills/WardenSkills
+#onready var debugger = $AllUIHere/Debugger
 #Save data
 const SAVE_DIR = "user://saves/"
 var save_path = SAVE_DIR + "save.dat"
@@ -104,6 +89,7 @@ var save_path = SAVE_DIR + "save.dat"
 var level = 0
 var entity_name = "Cei"
 #crude stats
+
 var health = 100
 const base_health = 100
 var max_health = 100
@@ -117,20 +103,20 @@ const base_max_resolve = 100
 
 const base_weight = 60
 var weight = 60
-const base_walk_speed = 3
-var walk_speed = 3 
-const base_run_speed = 6
-var run_speed = 6
-const base_climb_speed = 1.5 
-var climb_speed = 1.5
+const base_walk_speed = 6
+var walk_speed =6
+const base_run_speed = 8
+var run_speed = 8
+const base_climb_speed = 15
+var climb_speed =  15
 const base_crouch_speed = 2
 var crouch_speed = 2
 const base_jumping_power = 5 
 var jumping_power = 5
 const base_dash_power = 12
 var dash_power = 12
-var attribute = 100000000
-var spent_attribute_points = 0
+var attribute = 1000
+var skill_points = 1000
 var defense =  10
 var coordination = 1
 
@@ -241,21 +227,65 @@ var st_wisdom = wisdom
 var st_memory = memory
 var st_intelligence = intelligence
 var st_willpower = willpower
+#___________________________________Class Specific____________________________________________
+#set1
+var has_headstrong_rush_skill = false
+
+#invested points 
+var headstrong_rush_ps = 0
+var pomel_strike_ps = 0
+var cross_parry_ps = 0
+var measured_slice_ps = 0 
+var blood_rush_ps = 0
+#headstrong rush skill 
+#onready var HeadstrongrushCD = $AllUIHere/Skills/WardenSkills/Set1/HeadstrongRush/HeadstrongrushCD
+var headstrong_duration = 5
+var headstrong_rush_toggle = false
+#set3
+var has_pomel_strike_skill = false
+var has_entagle_skill = false 
+var has_disarm_skill = false
+var has_expose_skill = false
+var has_cripple_skill = false 
+#set4
+var has_wallop_skill = false
+var has_rising_strike_skill = false
+var has_schadenfreude_skill = false
+var has_eviscerate_skill = false 
+var has_punishing_blow_skill = false 
+#set5
+var has_shield_bash_counter_skill = false
+var has_lunge_skill = false 
+var has_provocation_skill = false 
+var has_shield_barrage_skill = false #move and attack while covered behind the shield at the same time 
+var has_shield_counter_skill= false #after blocking a hit, bash enemy with the shield and trust
 
 
-func _ready():	
+func _ready():
+	instanceui()
+	set_process_input(true)	
+	direction = Vector3.BACK.rotated(Vector3.UP,  camera_h.global_transform.basis.get_euler().y)
 	loadPlayerData()
 	# Load the tooltip scene
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
-	direction = Vector3.BACK.rotated(Vector3.UP,  camera_h.global_transform.basis.get_euler().y)
 func _input(event):
 	if event is InputEventKey:
 		if event.scancode == KEY_P:  # Replace with the desired key code
 			resetSavedData()
 	if event is InputEventMouseMotion:
-
 		camrot_h += -event.relative.x * h_sensitivity
 		camrot_v += event.relative.y * v_sensitivity
+		if minimap_rotate:
+			minimap_camera.rotate_y(deg2rad(-event.relative.x * mouse_sense))
+	#Scrollwheel zoom in and out 		
+	if event is InputEventMouseButton and event.button_index == BUTTON_WHEEL_UP:
+		# Zoom in when scrolling up
+		Zoom(-1)
+	elif event is InputEventMouseButton and event.button_index == BUTTON_WHEEL_DOWN:
+		# Zoom out when scrolling down
+		Zoom(1)
+
+
 func _physics_process(delta):
 	if not stunned:
 			jump()
@@ -263,70 +293,84 @@ func _physics_process(delta):
 			dodgeFront(delta)
 			dodgeLeft(delta)
 			dodgeRight(delta)	
-			movement()
+			move()
+			movementStates()
 			climbing()
 			teleport()
-			gliding()
+			minimapFollow()	
 	mouseMode()		
 	stiffCamera(delta)	
 	ridingCollision()
-	Gravity()
+	Gravity(delta)
 	interpol(delta)
-	debug()
-	debugText()	
+	gliding()
+	#debug()
+	#debugText()	
 	animationsAll(delta)
 	cameraRotation(delta)
-
+	unstuckDisplayCD()
+	unstuckVisibility()
+	unstuckDisplayCD()
 #__________________________________________Movement_________________________________
-func movement():
+var run_toggle = false
+var crouch_toggle = false
+var sprint_toggle = false
+func move():
 	var h_rot =  camera_h.global_transform.basis.get_euler().y
 	movement_speed = 0
-	angular_acceleration = 10
+	angular_acceleration = 3.25
 	acceleration = 15
-# Movement and strafe
-	if Input.is_action_pressed("forward") or Input.is_action_pressed("backward") or Input.is_action_pressed("left") or Input.is_action_pressed("right"):
-		direction = Vector3(Input.get_action_strength("left") - Input.get_action_strength("right"),
-					0,
-					Input.get_action_strength("forward") - Input.get_action_strength("backward"))
-		direction = direction.rotated(Vector3.UP, h_rot).normalized()
-		is_walking = true
-		# Movement States
-		if Input.is_action_pressed("run") and is_walking and not is_climbing and not blocking and not is_swimming:
-			movement_speed = run_speed
-			is_running = true
-			enabled_climbing = false
-			is_crouching = false
-
-			is_aiming = false
-		elif Input.is_action_pressed("crouch") and is_walking and !is_climbing and !is_swimming:
-			movement_speed = crouch_speed
-			is_running = false
-			enabled_climbing = false
-			is_crouching = true
-			is_aiming = false
-		#Computer
-		elif Input.is_action_pressed("sprint") and is_walking and not is_climbing and not blocking and not is_swimming:
-				movement_speed = sprint_speed
-				is_sprinting = true
-				enabled_climbing = false
-				is_crouching = false
-				is_aiming = false
-		else:  # Walk State and speed
-			movement_speed = walk_speed
-			is_sprinting = false
-			is_crouching = false
-			enabled_climbing = true
-			is_crouching = false
-	else:
-		is_walking = false
-		is_running = false
-		is_sprinting = false
-		is_crouching = false
-		is_crouching = false
 	movement.z = horizontal_velocity.z + vertical_velocity.z
 	movement.x = horizontal_velocity.x + vertical_velocity.x
 	movement.y = vertical_velocity.y
 	move_and_slide(movement, Vector3.UP)
+	if not is_climbing:
+		if Input.is_action_pressed("forward") or Input.is_action_pressed("backward") or Input.is_action_pressed("left") or Input.is_action_pressed("right"):
+			direction = Vector3(Input.get_action_strength("left") - Input.get_action_strength("right"),
+						0,
+						Input.get_action_strength("forward") - Input.get_action_strength("backward"))
+			direction = direction.rotated(Vector3.UP, h_rot).normalized()
+			is_walking = true
+		else: 
+			is_walking = false
+func movementStates():
+	if is_walking:	
+			# Movement States
+		if Input.is_action_pressed("run") and is_walking and not is_climbing and not blocking and not is_swimming and not is_aiming:
+					movement_speed = run_speed
+					is_in_combat = false
+					is_running = true
+					enabled_climbing = false
+					is_crouching = false
+					is_aiming = false
+		elif Input.is_action_pressed("C") and is_walking and !is_climbing and !is_swimming:
+				movement_speed = crouch_speed
+				is_running = false
+				enabled_climbing = false
+				is_crouching = true
+				is_aiming = false
+				is_in_combat = false
+		elif Input.is_action_pressed("sprint") and is_walking and not is_climbing and not blocking and not is_swimming and not is_aiming:
+					movement_speed = sprint_speed
+					is_sprinting = true
+					enabled_climbing = false
+					is_crouching = false
+					is_aiming = false
+					is_in_combat = false
+		else:  # Walk State and speed
+				movement_speed = walk_speed
+				is_sprinting = false
+				is_crouching = false
+				enabled_climbing = true
+				is_crouching = false
+				is_running = false
+	else:  # Walk State and speed
+			is_sprinting = false
+			is_crouching = false
+			enabled_climbing = true
+			is_crouching = false
+			is_running = false
+			
 func dodgeBack(delta):#Doddge when in strafe mode
 		if dash_countback > 0:
 			dash_timerback += delta
@@ -338,7 +382,6 @@ func dodgeBack(delta):#Doddge when in strafe mode
 		if dash_countback == 2 and dash_timerback < double_press_time:
 			horizontal_velocity = direction * dash_power
 			backstep = true
-
 			enabled_climbing = false
 		else:
 			enabled_climbing = true
@@ -356,7 +399,6 @@ func dodgeFront(delta):#Dodge when in strafe mode
 			frontstep = true
 			enabled_climbing = false
 		else:
-
 			enabled_climbing = true
 			frontstep = false
 func dodgeLeft(delta):#Dodge when in strafe mode
@@ -390,45 +432,110 @@ func dodgeRight(delta):#Dodge when in strafe mode
 			enabled_climbing = true
 			rightstep = false
 func teleport():
-	if Input.is_action_just_pressed("teleport"):
-		vertical_velocity = Vector3.UP * jump_force * 4
+	if Input.is_action_just_pressed("X"):
 		var teleport_vector = direction.normalized() * teleport_distance
 		var teleport_position = translation + teleport_vector
 		var collision = move_and_collide(teleport_vector)
 		if collision:
 			teleport_position = collision.position
 			translation = teleport_position
+#climbing section
+var wall_incline
+var is_wall_in_range = false
+onready var head_ray =$Mesh/HeadRay
 func climbing():
 	if is_on_wall():
-		if  Input.is_action_pressed("ui_accept"):
-				vertical_velocity = Vector3.UP * climb_speed 
-				horizontal_velocity = direction * climb_speed
+		if  Input.is_action_pressed("forward"):
+				checkWallInclination()
+				vertical_velocity = Vector3.UP * (strength + (agility * 0.15))
+				#horizontal_velocity = direction * 1
 				is_climbing = true
 				is_swimming = false
-	else:
+				if not head_ray.is_colliding() and not is_wall_in_range:#vaulting
+					an.play("TPose",blend, strength)#vaulting animation placeholder
+				elif not is_wall_in_range:#normal climb
+					an.play("climb",blend, strength)
+				else:
+					an.play("crawl incline", blend, strength)
+					horizontal_velocity = direction * climb_speed * 3.5 
+		else:
 			is_climbing = false
+	else:
+		is_climbing = false
+func checkWallInclination():
+	if get_slide_count() > 0:
+		var collision_info = get_slide_collision(0)
+		var normal = collision_info.normal
+		if normal.length_squared() > 0:
+			wall_incline = acos(normal.y)  # Calculate the inclination angle in radians
+			wall_incline = rad2deg(wall_incline)  # Convert inclination angle to degrees
+			if normal.x < 0:
+				wall_incline = -wall_incline
+			# Check if the wall inclination is within the specified range 
+			is_wall_in_range = (wall_incline >= -60 and wall_incline <= 60)
+		else:
+			wall_incline = 0  # Set to 0 if the normal is not valid
+			is_wall_in_range = false
+	else:
+		wall_incline = 0  # Set to 0 if there is no collision
+		is_wall_in_range = false
 func jump():
-	if Input.is_action_pressed("ui_accept") and is_on_floor():
-		vertical_velocity = Vector3.UP * jump_force * 3
-	if Input.is_action_pressed("ui_accept") and is_swimming:
+	if Input.is_action_pressed("jump") and is_on_floor():
+		vertical_velocity = Vector3.UP *  10
+	if Input.is_action_pressed("jump") and is_swimming:
 		vertical_velocity = Vector3.UP * 5
+	elif Input.is_action_pressed("C") and is_swimming:
+		vertical_velocity = Vector3.DOWN * 5
 func gliding():
 	if is_falling:
-		if Input.is_action_pressed("glide"):
+		if Input.is_action_pressed("Z"):
+			vertical_velocity = direction * 1 
+			horizontal_velocity = direction * 20 * agility 
 			vertical_velocity = Vector3.ZERO  # No vertical movement while gliding
-			movement_speed =  walk_speed		
+			movement_speed =  walk_speed
+			an.play("TPose")
+			is_in_combat = false 
 func interpol(delta):
 	horizontal_velocity = horizontal_velocity.linear_interpolate(direction.normalized() * movement_speed, acceleration * delta)
-func Gravity():
-	# Gravity and stop sliding on floors
-	if not is_on_floor() and not is_swimming:
-		vertical_velocity += Vector3.DOWN * 2.5
-		is_falling = true
-		is_swimming = false
-	else:
-		vertical_velocity = -get_floor_normal() * gravity / 2.5
-		is_falling = false		
+func Gravity(delta):# Gravity and stop sliding on floors
+	if not is_climbing:
+		if not is_on_floor() and not is_swimming:
+			vertical_velocity += Vector3.DOWN * 60 * delta
+			is_falling = true
+		else:
+			vertical_velocity = -get_floor_normal() * gravity / 2.5 
+			is_falling = false
 #___________________________________________Camera_______________________________________________
+var camrot_h = 0
+var camrot_v = 0
+onready var parent = $".."
+export var cam_v_max = 200 # -75 recommended
+export var cam_v_min = -125 # -55 recommended
+onready var camera_v =$Camroot/h/v
+onready var camera_h =$Camroot/h
+onready var camera = $Camroot/h/v/Camera
+onready var minimap = $Minimap
+onready var minimap_camera = $Minimap/Viewport/Camera
+var minimap_rotate = false
+var h_sensitivity = 0.1
+var v_sensitivity = 0.1
+var rot_speed_multiplier = .15 #reduce this to make the rotation radius larger
+var h_acceleration = 10
+var v_acceleration = 10
+var mouse_captured = true
+var touch_start_position = Vector2.ZERO
+var zoom_speed = 0.1
+# Add this function to handle zooming logic
+func Zoom(direction):
+	# Adjust the camera's position based on the zoom direction
+	camera.translation.y += direction * zoom_speed
+	camera.translation.z -= direction * zoom_speed
+func _on_Sensitivity_pressed():
+	$Minimap/sensitivity_label.text = "cam sens:  " + str(h_sensitivity)
+	h_sensitivity += 0.025
+func _on_SensitivityMin_pressed():
+	h_sensitivity -= 0.025
+	$Minimap/sensitivity_label.text = "cam sens:  " + str(h_sensitivity)
 func cameraRotation(delta):
 	if not is_cursor:
 		camrot_v = clamp(camrot_v, cam_v_min, cam_v_max)
@@ -436,11 +543,12 @@ func cameraRotation(delta):
 		camera_h.rotation_degrees.y = lerp(camera_h.rotation_degrees.y, camrot_h, delta * h_acceleration)
 		camera_v.rotation_degrees.x = lerp(camera_v.rotation_degrees.x, camrot_v, delta * v_acceleration)
 func mouseMode():
-	if Input.is_action_pressed("aim"):
+	if Input.is_action_pressed("rclick"):
 		is_aiming = true
 	else:
 		is_aiming = false	
 	if Input.is_action_just_pressed("ui_cancel"):	# Toggle mouse mode
+		is_in_combat = false
 		if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 			is_cursor = true
@@ -452,6 +560,8 @@ func stiffCamera(delta):
 			player_mesh.rotation.y = lerp_angle(player_mesh.rotation.y, camera_h.rotation.y, delta * angular_acceleration)
 		else:
 			player_mesh.rotation.y = lerp_angle(player_mesh.rotation.y, atan2(direction.x, direction.z) - rotation.y, delta * angular_acceleration)	
+func minimapFollow():# Update the position of the minimap camera
+	minimap_camera.translation = Vector3(translation.x, 30,translation.z)
 #_______________________________________Collisions__________________________________
 func ridingCollision():
 	if has_ride:
@@ -464,6 +574,7 @@ func ridingCollision():
 		set_collision_mask(1)   # Set to the original collision mask
 #__________________________________Animation Section_____________________________________
 func animationsAll(delta):
+	
 	if is_in_combat:
 		if barehanded_mode:
 			animationsBarehanded()	
@@ -478,13 +589,21 @@ func animationsAll(delta):
 		elif sword_and_shield_mode:
 			animationsSwordAndShield(delta)	
 	else:
-		if is_aiming:
-			animationStrafe()
+		if not is_swimming:
+			if is_aiming:
+				animationStrafe()
+			else:
+				animationOutOfCombat()	
+	if is_swimming:
+		if is_walking:
+			an.play("swim",blend)
 		else:
-			animationOutOfCombat()	
+			an.play("swim idle",blend)
+	if not is_on_floor() and not is_climbing and not is_swimming:
+		an.play("fall loop",blend)
 #____________________________________Sword and Shield Animations_______________________________________
 func animationsSwordAndShield(delta):
-	if Input.is_action_pressed("aim"): #block
+	if Input.is_action_pressed("rclick"): #block
 		if  dash_countforward ==2:
 			an.play("slide",blend)
 		elif  dash_countleft ==2:
@@ -493,7 +612,7 @@ func animationsSwordAndShield(delta):
 			an.play("dodge right",blend)
 		elif  dash_countback ==2:
 			an.play_backwards("backstep",blend)
-		elif Input.is_action_pressed("attack"):
+		elif Input.is_action_pressed("attack") and has_pomel_strike_skill:
 			an.play("pomel strike",blend)#placeholder counter attack
 			horizontal_velocity = Vector3.ZERO
 		elif Input.is_action_pressed("forward") and Input.is_action_pressed("left"):
@@ -525,16 +644,15 @@ func animationsSwordAndShield(delta):
 			an.play("combo attack sword and shield cycle")
 			moveAttack(delta)
 		elif is_sliding and attacking:
-			an.play("swirl melee attack")
+			an.play("swirl melee attack",blend)
 		elif is_walking:
-			an.play("walk dual wield")		
+			an.play("walk sword and shield block ",blend)		
 		else:
-			an.play("idle combat")
+			an.play("idle combat",blend)
 #_________________________________________One handed Sword animations_____________________________________________
 func animations1HSword():
 	if Input.is_action_pressed("attack"):
 		an.play("combo attack 1h")
-
 	elif is_walking:
 		if not injured:
 			an.play("walk")
@@ -547,17 +665,12 @@ func animations1HSword():
 			an.play("sneak walk")
 		else:
 			an.play("sneak")
-	elif is_climbing:
-		an.play("climb")
-	elif is_swimming:
-		an.play("swim")
 	else:
 		an.play("idle combat")
 #_____________________________________________Two handed Sword_____________________________________
 func animations2HSword():
 	if Input.is_action_pressed("attack"):
 		an.play("combo attack 2h")
-
 	elif is_walking:
 		if not injured:
 			an.play("walk")
@@ -570,17 +683,12 @@ func animations2HSword():
 			an.play("sneak walk")
 		else:
 			an.play("sneak")
-	elif is_climbing:
-		an.play("climb")
-	elif is_swimming:
-		an.play("swim")	
 	else:
 		an.play("idle combat 2h", blend)
 #_____________________________________________Dual Wielding______________________________________________
 func animationsDualWield():
 	if Input.is_action_pressed("attack"):
 		an.play("combo attack 2w2v", blend)
-
 	elif is_walking:
 		if not injured:
 			an.play("walk")
@@ -593,10 +701,6 @@ func animationsDualWield():
 			an.play("sneak walk")
 		else:
 			an.play("sneak")
-	elif is_climbing:
-		an.play("climb")
-	elif is_swimming:
-		an.play("swim")	
 	else:
 		an.play("idle combat 2h", blend)
 #__________________________________________Bow______________________________________
@@ -625,10 +729,6 @@ func animationsBow():
 			an.play("sneak walk")
 		else:
 			an.play("sneak")
-	elif is_climbing:
-		an.play("climb")
-	elif is_swimming:
-		an.play("swim")	
 	else:
 		an.play("idle combat", blend)
 #___________________________________________Empty Handed_____________________________________________
@@ -647,12 +747,8 @@ func animationsBarehanded():
 			an.play("sneak walk")
 		else:
 			an.play("sneak")
-	elif is_climbing:
-		an.play("climb")
-	elif is_swimming:
-		an.play("swim")
-	elif Input.is_action_just_pressed("ui_accept"):
-		an.play_backwards("landing")
+	elif Input.is_action_just_pressed("jump"):
+		an.play_backwards("terrified")
 	else:
 		an.play("idle combat")
 #____________________________________________Out of Combat_________________________________
@@ -666,14 +762,16 @@ func animationOutOfCombat(): #normal
 			an.play("run")
 		elif is_running:
 			an.play("run")
-		elif is_walking and Input.is_action_pressed("crouch"):
+		elif is_walking and Input.is_action_pressed("C"):
 			an.play("sneak walk")
-		elif is_running and Input.is_action_pressed("crouch"):
+		elif is_running and Input.is_action_pressed("C"):
 			an.play("sneak run")
 		elif is_walking:
 			an.play("walk")
-		elif Input.is_action_pressed("crouch"):
+		elif Input.is_action_pressed("C"):
 			an.play("sneak",blend)
+		elif Input.is_action_just_pressed("Q"):
+			an.play_backwards("terrified")			
 		else:
 			an.play("idle", 0.25)
 func animationStrafe(): #strafe
@@ -703,88 +801,10 @@ func animationStrafe(): #strafe
 			an.play("right",blend)
 		elif Input.is_action_pressed("forward"):
 			an.play("walk")
-		elif Input.is_action_just_pressed("ui_accept"):
+		elif Input.is_action_just_pressed("jump"):
 			an.play_backwards("landing")
 		else:
 			an.play("idle",blend)
-#_____________________________________________Debugger_________________________
-func debug():
-	if Input.is_action_just_pressed("test1"):
-		duel_wield_mode = false
-		bow_mode = false
-		two_handed_sword_mode = false
-		one_handed_sword_mode = false
-		sword_and_shield_mode = false
-		crossbow_mode = false
-		magic_staff_mode = false
-		barehanded_mode = true
-	elif Input.is_action_just_pressed("test2"):
-		duel_wield_mode = false
-		bow_mode = false
-		two_handed_sword_mode = false
-		one_handed_sword_mode = true
-		sword_and_shield_mode = false
-		crossbow_mode = false
-		magic_staff_mode = false
-		barehanded_mode = false		
-	elif Input.is_action_just_pressed("test3"):	
-		$"Mesh/Armature020/Skeleton/sword long".visible = false
-		$"Mesh/Armature020/Skeleton/sword long001".visible = false
-		$Mesh/Armature020/Skeleton/bow.visible = true
-		$Mesh/Armature020/Skeleton/shield.visible = false 		
-		duel_wield_mode = false
-		bow_mode = true
-		two_handed_sword_mode = false
-		one_handed_sword_mode = false
-		sword_and_shield_mode = false
-		crossbow_mode = false
-		magic_staff_mode = false
-		barehanded_mode = false		
-	elif Input.is_action_just_pressed("test4"):
-		$"Mesh/Armature020/Skeleton/sword long".visible = true 
-		$"Mesh/Armature020/Skeleton/sword long001".visible = false
-		$Mesh/Armature020/Skeleton/bow.visible = false 
-		$Mesh/Armature020/Skeleton/shield.visible = false 
-		duel_wield_mode = false
-		bow_mode = false
-		two_handed_sword_mode = true
-		one_handed_sword_mode = false
-		sword_and_shield_mode = false
-		crossbow_mode = false
-		magic_staff_mode = false
-		barehanded_mode = false
-	elif Input.is_action_just_pressed("test5"):
-		$"Mesh/Armature020/Skeleton/sword long".visible = true 
-		$"Mesh/Armature020/Skeleton/sword long001".visible = true 
-		$Mesh/Armature020/Skeleton/bow.visible = false 
-		$Mesh/Armature020/Skeleton/shield.visible = false 
-		duel_wield_mode = true
-		bow_mode = false
-		two_handed_sword_mode = false
-		one_handed_sword_mode = false
-		sword_and_shield_mode = false
-		crossbow_mode = false
-		magic_staff_mode = false
-		barehanded_mode = false
-	elif Input.is_action_just_pressed("test6"):
-		$"Mesh/Armature020/Skeleton/sword long".visible = true 
-		$"Mesh/Armature020/Skeleton/sword long001".visible = false
-		$Mesh/Armature020/Skeleton/bow.visible = false 
-		$Mesh/Armature020/Skeleton/shield.visible = true
-		duel_wield_mode = false
-		bow_mode = false
-		two_handed_sword_mode = false
-		one_handed_sword_mode = false
-		sword_and_shield_mode = true
-		crossbow_mode = false
-		magic_staff_mode = false
-		barehanded_mode = false
-	elif Input.is_action_just_pressed("test9"):
-		OS.window_fullscreen = !OS.window_fullscreen
-	elif Input.is_action_just_pressed("test0"):
-		is_in_combat = !is_in_combat
-	elif Input.is_action_just_pressed("skills"):	
-		$AllUIHere/Skills.visible = !$AllUIHere/Skills/.visible
 #Combat Stufff
 func moveAttack(delta):
 	if can_move:
@@ -801,35 +821,22 @@ func stop():
 func start():
 	can_move = true 
 #________________________________________Graphic User Interface____________________________________
-func debugText():
-	debugger.text = "Memory: %.3f MB" % (OS.get_static_memory_usage() / (1024.0 * 1024.0))
-	debugger.text += "\nPosition: (%.1f, %.1f, %.1f)" % [global_transform.origin.x,global_transform.origin.y,global_transform.origin.z]
-	debugger.text += "\nFPS: %d" % Engine.get_frames_per_second()
+#func debugText():
+	#debugger.text = "Memory: %.3f MB" % (OS.get_static_memory_usage() / (1024.0 * 1024.0))
+	#debugger.text += "\nPosition: (%.1f, %.1f, %.1f)" % [global_transform.origin.x, global_transform.origin.y, global_transform.origin.z]
+	#debugger.text += "\nFPS: %d" % (Engine.get_frames_per_second() + rand_range(0,0))
+
+
+	# Include the cooldown information
+	#debugger.text += "\nHeadstrong Rush Cooldown: %.1f" % HeadstrongrushCD.time_left
 #_________________________________________Warden Skills_____________________________________________
-func _on_WardenSkillsButton_pressed():
-	warden_skill_ui.visible = true
-#_________________________________________skill 0____________________________________________________
-func _on_Skill0_mouse_entered():
-	var tool_tip_instance = tool_tip.instance()
-	var for_text = "Disarm:                                                     Disarm the enemy and decrease their strength and dexterity by 25% for 30 seconds "
-	add_child(tool_tip_instance)
-	tool_tip_instance._make_custom_tooltip(for_text)
-
-	
-func _on_Skill0_mouse_exited():
-	for child in get_children():
-		if child.is_in_group("Tooltip"):
-			child.queue_free()	
-func _on_Skill0_pressed():	
-	print("skill0pressed")
-func _on_skill1_pressed():
-	print("skill1pressed")
+#func _on_WardenSkillsButton_pressed():
+#	warden_skill_ui.visible = true
 #_______________________________________________Save Data__________________________________________
-
 func savePlayerData():
 	var data = {
 		"position": translation,
-		"rotation": player_mesh.rotation_degrees,
+		"unstuck_cd" : unstuck_cd,
 #camera stuff
 		"H_rotation": camera_h.rotation_degrees,
 		"V_rotation": camera_v.rotation_degrees,
@@ -842,7 +849,6 @@ func savePlayerData():
 		"spent_attribute_points_wis": spent_attribute_points_wis,
 		"spent_attribute_points_cha": spent_attribute_points_cha,
 		"spent_attribute_points_vit": spent_attribute_points_vit,
-		
 #Brain attributes
 		"creativity": creativity,
 		"wisdom" : wisdom,
@@ -899,11 +905,14 @@ func savePlayerData():
 		#"hair3": has_hair3,
 		#"hair_color": hair_color,
 #skin 
-		#"skin0": skin0,
-		#"skin1": skin1,
-		#"skin2": skin2,
-		#"skin3": skin3,
-	
+		"skin0": skin0,
+		"skin1": skin1,
+		"skin2": skin2,
+		"skin3": skin3,
+#skills 
+		"headstrong_rush_ps": headstrong_rush_ps,
+		"pomel_strike_ps": pomel_strike_ps
+		
 		}
 	var dir = Directory.new()
 	if !dir.dir_exists(SAVE_DIR):
@@ -920,11 +929,10 @@ func loadPlayerData():
 		if error == OK:
 			var player_data = file.get_var()
 			file.close()
-
 			if "position" in player_data:
 				translation = player_data["position"]
-			if "rotation" in player_data:
-				rotation_degrees = player_data["rotation"]
+			if "unstuck_cd" in player_data:
+				unstuck_cd = player_data["unstuck_cd"]
 #attributes 
 			if "attribute" in player_data:
 				attribute = player_data["attribute"]
@@ -1013,26 +1021,20 @@ func loadPlayerData():
 				resolve = player_data["resolve"]
 			if "max_resolve" in player_data:
 				max_resolve = player_data["max_resolve"]
-#hair				
-		#	if "hair0" in player_data:
-			#	has_hair0 = player_data["hair0"]
-			#if "hair1" in player_data:
-			#	has_hair1 = player_data["hair1"]
-			#if "hair2" in player_data:
-			#	has_hair2 = player_data["hair2"]
-			#if "hair3" in player_data:
-			#	has_hair3 = player_data["hair3"]
-			#if "hair_color"	 in player_data:
-			#	hair_color = player_data["hair_color"]
-#skin 
-		#	if "skin0" in player_data:
-		#		skin.skin0 = player_data["skin0"]
-			#if "skin1" in player_data:
-		#		skin.skin1 = player_data["skin1"]
-		#	if "skin2" in player_data:
-			#	skin.skin2 = player_data["skin2"]
-		#	if "skin3" in player_data:
-			#	skin.skin3 = player_data["skin3"]
+#skills 
+			if "headstrong_rush_ps" in player_data:
+				headstrong_rush_ps = player_data["headstrong_rush_ps"]
+			if "pomel_strike_ps" in player_data:
+				pomel_strike_ps = player_data["pomel_strike_ps"]
+#skins      
+			if "skin0" in player_data:
+				skin0 = player_data["skin0"]
+			if "skin1" in player_data:
+				skin1 = player_data["skin1"]
+			if "skin2" in player_data:
+				skin2 = player_data["skin2"]
+			if "skin3" in player_data:
+				skin3 = player_data["skin3"]
 func resetSavedData():
 	var dir = Directory.new()
 	if dir.file_exists(save_path):
@@ -1040,3 +1042,127 @@ func resetSavedData():
 		print("Saved data reset")
 func _on_SaveDataTimer_timeout():
 	savePlayerData()
+#___________________________________________HeadStrong Rush UI______________________________
+func _on_HeadstrongRush_pressed():
+	if headstrong_rush_ps < 5:
+		headstrong_rush_ps += 1
+		skill_points -= 1		
+		if headstrong_rush_ps > 0:
+			has_headstrong_rush_skill = true 
+	$AllUIHere/Skills/WardenSkills/Set1/HeadstrongRush/SkillLevel.text = str(headstrong_rush_ps)
+func _on_HeadstrongRush_mouse_exited():
+	for child in get_children():
+		if child.is_in_group("Tooltip"):
+			child.queue_free()	
+#func _on_HeadstrongRush_mouse_entered():
+#	var tool_tip_instance = tool_tip.instance()
+	#var skill_name = "Headstrong Rush:"
+	#var for_text = "Charge a short distance at high speed dealing damage to enemies that you collide with"
+#	add_child(tool_tip_instance)
+#	tool_tip_instance._make_custom_tooltip(for_text)
+	#tool_tip_instance.skillName(skill_name)
+#func _on_PomelStrike_mouse_entered():
+#	var tool_tip_instance = tool_tip.instance()
+#	var skill_name = "Pomel Strike"
+#	var for_text = "counter strike with a pome"
+#	add_child(tool_tip_instance)
+#	tool_tip_instance._make_custom_tooltip(for_text)
+#	tool_tip_instance.skillName(skill_name)
+#func _on_PomelStrike_mouse_exited():
+#	for child in get_children():
+#		if child.is_in_group("Tooltip"):
+#			child.queue_free()	
+#________________________________________Headstrong Rush skill______________________________
+func _on_Duration_timeout():
+	headstrong_rush_toggle = false
+	is_running = false
+#func _on_HeadstrongrushCD_timeout():
+#	 HeadstrongrushCD.stop()
+func _on_PomelStrike_pressed():
+	if pomel_strike_ps < 5:
+		pomel_strike_ps += 1
+		skill_points -= 1		
+		if pomel_strike_ps > 0:
+			has_pomel_strike_skill = true 
+	$AllUIHere/Skills/WardenSkills/Set1/PomelStrike/SkillLevel.text = str(pomel_strike_ps)	
+func updateSkills():
+	if pomel_strike_ps > 0:
+		has_pomel_strike_skill = true 
+	if headstrong_rush_ps > 0:
+		has_headstrong_rush_skill = true 	
+	$AllUIHere/Skills/WardenSkills/Set1/PomelStrike/SkillLevel.text = str(pomel_strike_ps)
+	$AllUIHere/Skills/WardenSkills/Set1/HeadstrongRush/SkillLevel.text = str(headstrong_rush_ps)
+func _on_MinimapRotation_pressed():
+	minimap_rotate = !minimap_rotate
+#__________________________________________optimization and performance__________________________________________________________________	
+func _on_FPS_pressed():
+	var current_fps = Engine.get_target_fps()
+	if current_fps == 15:
+		Engine.set_target_fps(20)
+	elif current_fps == 20:
+		Engine.set_target_fps(25)
+	elif current_fps == 25:
+		Engine.set_target_fps(30)
+	elif current_fps == 30:
+		Engine.set_target_fps(35)
+	elif current_fps == 35:
+		Engine.set_target_fps(40)
+	elif current_fps == 40:
+		Engine.set_target_fps(80)
+	elif current_fps == 80:
+		Engine.set_target_fps(15)
+func updateFPS():
+	$Minimap/FPSLabel.text  = "%d" % Engine.get_frames_per_second()
+			
+#_____________________________________________Water Detection________________________________________________________________
+func _on_WaterDetector_area_entered(area):
+	if area.is_in_group("Water"):
+		is_swimming = true
+func _on_WaterDetector_area_exited(area):
+	if area.is_in_group("Water"):
+		is_swimming = false
+#_______________________________________________________skin editor__________________________________________________
+onready var torso = $Mesh/Armature020/Skeleton/torso0
+onready var legs = $Mesh/Armature020/Skeleton/legs0
+onready var face = $Mesh/Armature020/Skeleton/face
+onready var feet = $Mesh/Armature020/Skeleton/feet0
+onready var hands = $Mesh/Armature020/Skeleton/hands0
+#onready var body_material = preload("res://player/body_002.material")
+#onready var test_replace_material = preload("res://World/Material_001.material")
+var skin0 = false
+var skin1 = false
+var skin2 = false
+var skin3 = false 
+#__________________________________________Unstuck button, teleports the player to world origin when stuck_______________________________
+var unstuck_cd = 0
+onready var unstuck_label =  $Minimap/UnstuckCDProgressBar/CdLabel
+onready var unstuck_button = $Minimap/Unstcuk
+onready var unstuck_cd_progress_bar = $Minimap/UnstuckCDProgressBar
+func unstuckDisplayCD():	
+	unstuck_label.text = str(int(unstuck_cd))
+func unstuckVisibility():
+	if unstuck_cd < 1:
+		unstuck_button.visible = true 
+		unstuck_cd_progress_bar.visible = false
+	else:
+		unstuck_button.visible = false
+		unstuck_cd_progress_bar.visible = true
+		unstuck_cd_progress_bar.value = ((unstuck_cd/1000.0) * 100.0)
+func _on_Unstcuk_pressed():
+	if unstuck_cd < 1:
+		unstuck_cd += 1000
+		translation = Vector3(0, 20, 0)
+func _on_UnstuckCDTimer_timeout():
+	unstuck_cd -= 75
+	updateFPS()
+func _on_Area_body_entered(body):
+	var aggro_power = -30
+	var damage = rand_range(1, 90)
+	if body.is_in_group("Enemy"):
+		# Assuming that the player is the instigator, change the argument accordingly
+		body.takedamage(damage,aggro_power, self)
+func instanceui():
+		var level_ui_scene = load("res://LevelUI.tscn")
+		var level_ui_instance = level_ui_scene.instance()
+		# Optionally, you can set the position or other properties of the instance here
+		add_child(level_ui_instance)
