@@ -1,0 +1,172 @@
+extends KinematicBody
+
+onready var tridi_label = $Label3D
+onready var eyes = $Eyes
+onready var players = get_tree().get_nodes_in_group("Player")
+const aggro_gain_radius = 20
+const turn_speed = 7
+const aggro_timer_interval = 1  # Set the interval according to your needs
+var is_target_at_melee_range : bool = false
+var is_chasing : bool = false
+var is_target_at_dash_range : bool = false
+var is_sprinting : bool = false
+class PlayerAggro:
+	var player : Node
+	var aggro : int
+var targets : Array = []
+var coward : PlayerAggro
+var speed = 4
+var velocity = Vector3()
+var delta = 0.04
+func _on_ProcessTimer_timeout():
+	is_moving()
+	gravity()
+	moveTowardsPlayerWithHighestAggro()
+	var aggro_info = gatherAggroInformation()
+	var target = findTargetWithHighestAggro()
+	animations(target)	
+	# Display the list of player aggro information on the label
+	displayAggroInfo(aggro_info)
+	# Rotate towards the target with the highest aggro
+	rotateTowardsTarget(target)
+	if target:
+		var distance_to_target = global_transform.origin.distance_to(target.player.global_transform.origin)
+		is_target_at_melee_range = distance_to_target <= 2.0
+		is_target_at_dash_range = distance_to_target > 0 and distance_to_target <= 8.0
+		is_chasing = distance_to_target > 8.0
+		if distance_to_target > 12 and distance_to_target <= 25:
+			is_sprinting = true
+		else:
+			is_sprinting = false
+func gatherAggroInformation() -> Array:
+	var aggro_info = []  # Array to store player aggro information
+	for player in players:
+		var distance = eyes.global_transform.origin.distance_to(player.global_transform.origin)
+		var playerAggro = getOrCreatePlayerAggro(player)
+		# Aggro change logic moved to _on_AggroTimer_timeout
+		aggro_info.append("ID: " + str(player.get_instance_id()) + " Aggro: " + str(playerAggro.aggro))
+	return aggro_info
+func getOrCreatePlayerAggro(player: Node) -> PlayerAggro:
+	for existingTarget in targets:
+		if existingTarget.player == player:
+			return existingTarget
+	var playerAggro = PlayerAggro.new()
+	playerAggro.player = player
+	targets.append(playerAggro)
+	return playerAggro
+func findTargetWithHighestAggro() -> PlayerAggro:
+	var highest_aggro = -1
+	var target : PlayerAggro = null
+	for playerAggro in targets:
+		if playerAggro.aggro > highest_aggro:
+			target = playerAggro
+			highest_aggro = playerAggro.aggro
+	return target
+func displayAggroInfo(aggro_info: Array):
+	tridi_label.text = "\n".join(aggro_info)
+func rotateTowardsTarget(target: PlayerAggro):
+	if target:
+		eyes.look_at(target.player.global_transform.origin, Vector3.UP)
+		rotate_y(deg2rad(eyes.rotation.y * turn_speed))
+func calculateAggroChange(distance, aggro):
+	if distance <= 1:
+		return 6
+	elif distance <= 5:
+		return 5
+	elif distance <= 7:
+		return 4
+	elif distance <= 9:
+		return 3
+	elif distance <= 10:
+		return 2
+	elif distance <= 15:
+		return 1
+	elif distance <= 20:
+		return 0
+	elif distance <= 25:
+		return -1
+	elif distance <= 30:
+		return max(-2, -aggro)
+	else:
+		return max(-50000, -aggro)
+func _on_AggroTimer_timeout():
+	for playerAggro in targets:
+		var distance = eyes.global_transform.origin.distance_to(playerAggro.player.global_transform.origin)
+		var aggro_change = calculateAggroChange(distance, playerAggro.aggro)
+
+		if distance <= aggro_gain_radius:
+			playerAggro.aggro += aggro_change
+		else:
+			playerAggro.aggro = max(0, playerAggro.aggro - 5)
+func takedamage(damage,aggro_power,instigator):
+	print(damage+ aggro_power)
+	var instigatorAggro = getOrCreatePlayerAggro(instigator)
+	instigatorAggro.aggro += damage + aggro_power
+
+func moveTowardsPlayerWithHighestAggro():
+	var target = findTargetWithHighestAggro()
+	if target:
+		# Assuming the enemy has a KinematicBody and a speed variable
+		var direction = (target.player.global_transform.origin - global_transform.origin).normalized()
+		direction.y = 0  # Set the Y component to 0 to prevent flying
+		move_and_slide(direction * speed)
+
+func is_moving() -> bool:
+	# Check if the enemy has a non-zero velocity	
+	return get_slide_count() > 0
+var is_dashing = false
+func dashSpeed():
+	print(speed)
+	is_dashing = !is_dashing
+	if is_dashing:
+		speed += 6
+	else:
+		speed -= 6
+func normalSpeed():
+	pass
+func animations(target: PlayerAggro):
+	var animation = $AnimationPlayer
+	if is_target_at_melee_range:
+		animation.play("slash", 0.4)
+		speed = 4
+	elif is_target_at_dash_range:
+		speed = 10
+		animation.play("dash", 0.4)	
+
+	elif is_sprinting:
+		speed = 20
+		animation.play("run", 0.4)
+	elif is_chasing:
+		speed = 4
+		animation.play("walk", 0.4)		
+	else:
+		animation.play("idle", 0.4)
+var gravity_force = Vector3(0, -9.8, 0)
+func gravity():	# Apply gravity
+	velocity += gravity_force
+	# Move the character
+	var movement = velocity 
+	move_and_collide(movement)
+
+func teleportBehindPlayer():
+	# 25% chance to teleport behind target with highest aggro
+	var target = findTargetWithHighestAggro()
+	if target and randf() < 0.3:
+		var mesh = target.player.find_node("Mesh")  # Assuming "Mesh" is a direct child of the target
+		if mesh:
+			var mesh_basis = mesh.global_transform.basis
+			var teleport_position = target.player.global_transform.origin - mesh_basis.z * 5.0
+			global_transform.origin = teleport_position
+func pushPlayerBack():
+	var target = findTargetWithHighestAggro()
+	var player_mesh = target.player.find_node("Mesh")  # Assuming "Mesh" is a direct child of the player
+	var player_camera = target.player.find_node("Camera")  # Assuming "Camera" is a direct child of the player
+
+	if player_camera:
+		var camera_transform = player_camera.global_transform
+		var camera_forward = -camera_transform.basis.z.normalized()
+
+		# Move the player backward (adjust the distance as needed)
+		var push_distance = 35
+		var movement = camera_forward * push_distance
+		target.player.move_and_slide(movement)
