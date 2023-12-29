@@ -457,7 +457,7 @@ func climbing():
 					an.play("climb",blend, strength)
 				else:
 					an.play("crawl incline", blend, strength)
-					horizontal_velocity = direction * climb_speed * 3.5 
+					horizontal_velocity = direction * walk_speed
 		else:
 			is_climbing = false
 	else:
@@ -1141,7 +1141,7 @@ onready var unstuck_cd_progress_bar = $Minimap/UnstuckCDProgressBar
 func unstuckDisplayCD():	
 	unstuck_label.text = str(int(unstuck_cd))
 func unstuckVisibility():
-	if unstuck_cd < 1:
+	if unstuck_cd == 0:
 		unstuck_button.visible = true 
 		unstuck_cd_progress_bar.visible = false
 	else:
@@ -1149,12 +1149,17 @@ func unstuckVisibility():
 		unstuck_cd_progress_bar.visible = true
 		unstuck_cd_progress_bar.value = ((unstuck_cd/1000.0) * 100.0)
 func _on_Unstcuk_pressed():
-	if unstuck_cd < 1:
-		unstuck_cd += 1000
-		translation = Vector3(0, 20, 0)
+	if unstuck_cd == 0:
+		unstuck_cd = 1000
+		translation = Vector3(0, 10, 0)
 func _on_UnstuckCDTimer_timeout():
-	unstuck_cd -= 75
+	if unstuck_cd > 0:
+		unstuck_cd -= 1
+		if unstuck_cd < 0:
+			unstuck_cd = 0
 	updateFPS()
+	
+	
 func _on_Area_body_entered(body):
 	var aggro_power = -30
 	var damage = rand_range(1, 90)
