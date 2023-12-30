@@ -259,6 +259,7 @@ var has_shield_counter_skill= false #after blocking a hit, bash enemy with the s
 
 
 func _ready():
+
 	#instanceui()
 	set_process_input(true)	
 	direction = Vector3.BACK.rotated(Vector3.UP,  camera_h.global_transform.basis.get_euler().y)
@@ -931,11 +932,18 @@ func savePlayerData():
 		"headstrong_rush_ps": headstrong_rush_ps,
 		"pomel_strike_ps": pomel_strike_ps,
 #inventory
+		"got_weapon": got_weapon,
+		"got_sec_weapon": got_sec_weapon,
 		"has_sword0": has_sword0,
 		"has_sword1": has_sword1,
 		"has_sword2": has_sword2,
 		"has_sword3": has_sword3,
+		"has_sec_sword0": has_sec_sword0,
+		"has_sec_sword1": has_sec_sword1,
+		"has_sec_sword2": has_sec_sword2,
+		"has_sec_sword3": has_sec_sword3,
 		"has_shield3": has_shield3,
+		
 		}
 	var dir = Directory.new()
 	if !dir.dir_exists(SAVE_DIR):
@@ -1059,6 +1067,10 @@ func loadPlayerData():
 			if "skin3" in player_data:
 				skin3 = player_data["skin3"]
 #inventory 
+			if "got_weapon" in player_data:
+				got_weapon = player_data["got_weapon"]
+			if "got_sec_weapon" in player_data:
+				got_sec_weapon = player_data["got_sec_weapon"]
 			if "has_sword0" in player_data:
 				has_sword0 = player_data["has_sword0"]
 			if "has_sword1" in player_data:
@@ -1067,6 +1079,14 @@ func loadPlayerData():
 				has_sword2 = player_data["has_sword2"]
 			if "has_sword3" in player_data:
 				has_sword3 = player_data["has_sword3"]
+			if "has_sec_sword0" in player_data:
+				has_sec_sword0 = player_data["has_sec_sword0"]
+			if "has_sec_sword1" in player_data:
+				has_sec_sword1 = player_data["has_sec_sword1"]
+			if "has_sec_sword2" in player_data:
+				has_sec_sword2 = player_data["has_sec_sword2"]
+			if "has_sec_sword3" in player_data:
+				has_sec_sword3 = player_data["has_sec_sword3"]
 			if "has_shield3" in player_data:
 				has_shield3 = player_data["has_shield3"]	
 func resetSavedData():
@@ -1206,7 +1226,6 @@ func instanceui():
 		var level_ui_instance = level_ui_scene.instance()
 		# Optionally, you can set the position or other properties of the instance here
 		add_child(level_ui_instance)
-
 #__________________________________________________________Weapon Management____________________________________________
 
 #Main Weapon____________________________________________________________________________________________________________
@@ -1281,7 +1300,6 @@ func pickUpMainWeapon():
 				if not got_weapon:
 					check_and_delete(body)
 				got_weapon = true 
-
 func check_and_delete(body):
 	if body.get_parent() != attachment:
 		body.queue_free()
@@ -1305,11 +1323,12 @@ func dropMainWeapon():
 
 func overallMainWeaponLogic(delta):
 	switch()
+	pickUpMainWeapon()
+	dropMainWeapon()	
 	# Update drop cooldown timer
 	if dropTimer > 0.0:
 		dropTimer -= delta
-	pickUpMainWeapon()
-	dropMainWeapon()
+
 #Secondary Weapon_____________________________________________________________________________________________________________
 onready var attachment_secondary = $Mesh/Armature020/Skeleton/HoldL
 onready var attachment_shield = $Mesh/Armature020/Skeleton/HoldL2
@@ -1365,7 +1384,7 @@ func pickUpSecondaryWeapon():
 					has_shield3 = body.is_in_group("shield3")
 					if not got_sec_weapon:
 						check_and_delete(body)
-					got_sec_weapon = true 
+					got_sec_weapon = true
 func dropSecondary():
 	if current_secondary_Instance != null:
 		attachment_secondary.remove_child(current_secondary_Instance)
@@ -1398,8 +1417,8 @@ func dropSecondaryWeapon():
 		Effect0(false)
 func overallSecondaryWeaponLogic(delta):
 	switchSecondary()
+	pickUpSecondaryWeapon()
+	dropSecondaryWeapon()
 	# Update drop cooldown timer
 	if dropTimer > 0.0:
 		dropTimer -= delta
-	pickUpSecondaryWeapon()
-	dropSecondaryWeapon()
