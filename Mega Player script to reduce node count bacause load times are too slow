@@ -18,7 +18,6 @@ var has_ride = false
 # movement variables
 var velocity := Vector3()
 export var gravity = 9.8
-export var jump_force = 600
 export var sprint_speed = 20
 var teleport_distance = 35
 var attack_move_speed = 4.5
@@ -106,15 +105,13 @@ var weight = 60
 const base_walk_speed = 6
 var walk_speed =6
 const base_run_speed = 8
-var run_speed = 8
-const base_climb_speed = 15
-var climb_speed =  15
+var run_speed = 15
 const base_crouch_speed = 2
 var crouch_speed = 2
-const base_jumping_power = 5 
-var jumping_power = 5
-const base_dash_power = 12
-var dash_power = 12
+const base_jumping_power = 20
+var jumping_power = 20
+const base_dash_power = 20
+var dash_power = 20
 var attribute = 1000
 var skill_points = 1000
 var defense =  10
@@ -242,7 +239,7 @@ var blood_rush_ps = 0
 var headstrong_duration = 5
 var headstrong_rush_toggle = false
 #set3
-var has_pomel_strike_skill = false
+var has_pomel_strike_skill = true
 var has_entagle_skill = false 
 var has_disarm_skill = false
 var has_expose_skill = false
@@ -262,7 +259,7 @@ var has_shield_counter_skill= false #after blocking a hit, bash enemy with the s
 
 
 func _ready():
-	instanceui()
+	#instanceui()
 	set_process_input(true)	
 	direction = Vector3.BACK.rotated(Vector3.UP,  camera_h.global_transform.basis.get_euler().y)
 	loadPlayerData()
@@ -297,15 +294,22 @@ func _physics_process(delta):
 			movementStates()
 			climbing()
 			teleport()
-			minimapFollow()	
+			minimapFollow()
+			overallMainWeaponLogic(delta)
+			overallSecondaryWeaponLogic(delta)
+			if Input.is_action_just_pressed("ui_focus_next"):
+				is_in_combat = !is_in_combat
+			if Input.is_action_just_pressed("1"):
+				barehanded_mode = false
+				#duel_wield_mode = true 
+				sword_and_shield_mode = true 
 	mouseMode()		
 	stiffCamera(delta)	
 	ridingCollision()
 	Gravity(delta)
 	interpol(delta)
 	gliding()
-	#debug()
-	#debugText()	
+#	debug()
 	animationsAll(delta)
 	cameraRotation(delta)
 	unstuckDisplayCD()
@@ -370,7 +374,6 @@ func movementStates():
 			enabled_climbing = true
 			is_crouching = false
 			is_running = false
-			
 func dodgeBack(delta):#Doddge when in strafe mode
 		if dash_countback > 0:
 			dash_timerback += delta
@@ -444,24 +447,25 @@ var wall_incline
 var is_wall_in_range = false
 onready var head_ray =$Mesh/HeadRay
 func climbing():
-	if is_on_wall():
-		if  Input.is_action_pressed("forward"):
-				checkWallInclination()
-				vertical_velocity = Vector3.UP * (strength + (agility * 0.15))
-				#horizontal_velocity = direction * 1
-				is_climbing = true
-				is_swimming = false
-				if not head_ray.is_colliding() and not is_wall_in_range:#vaulting
-					an.play("TPose",blend, strength)#vaulting animation placeholder
-				elif not is_wall_in_range:#normal climb
-					an.play("climb",blend, strength)
-				else:
-					an.play("crawl incline", blend, strength)
-					horizontal_velocity = direction * walk_speed
+	if not is_swimming:
+		if is_on_wall():
+			if  Input.is_action_pressed("forward"):
+					checkWallInclination()
+					vertical_velocity = Vector3.UP * (strength + (agility * 0.15))
+					#horizontal_velocity = direction * 1
+					is_climbing = true
+					is_swimming = false
+					if not head_ray.is_colliding() and not is_wall_in_range:#vaulting
+						an.play("TPose",blend, strength)#vaulting animation placeholder
+					elif not is_wall_in_range:#normal climb
+						an.play("climb",blend, strength)
+					else:
+						an.play("crawl incline", blend, strength)
+						horizontal_velocity = direction * walk_speed
+			else:
+				is_climbing = false
 		else:
 			is_climbing = false
-	else:
-		is_climbing = false
 func checkWallInclination():
 	if get_slide_count() > 0:
 		var collision_info = get_slide_collision(0)
@@ -481,7 +485,7 @@ func checkWallInclination():
 		is_wall_in_range = false
 func jump():
 	if Input.is_action_pressed("jump") and is_on_floor():
-		vertical_velocity = Vector3.UP *  10
+		vertical_velocity = Vector3.UP *  jumping_power
 	if Input.is_action_pressed("jump") and is_swimming:
 		vertical_velocity = Vector3.UP * 5
 	elif Input.is_action_pressed("C") and is_swimming:
@@ -583,7 +587,7 @@ func animationsAll(delta):
 		elif two_handed_sword_mode:
 			animations2HSword()
 		elif duel_wield_mode:
-			animationsDualWield()		
+			animationsDualWield()
 		elif bow_mode:
 			animationsBow()	
 		elif sword_and_shield_mode:
@@ -616,21 +620,21 @@ func animationsSwordAndShield(delta):
 			an.play("pomel strike",blend)#placeholder counter attack
 			horizontal_velocity = Vector3.ZERO
 		elif Input.is_action_pressed("forward") and Input.is_action_pressed("left"):
-			an.play("left front sword and shield block",blend)
+			an.play("block shield front left",blend)
 		elif Input.is_action_pressed("backward") and Input.is_action_pressed("left"):
-			an.play_backwards("right front sword and shield block",blend)
+			an.play_backwards("block shield front right",blend)
 		elif Input.is_action_pressed("backward") and Input.is_action_pressed("right"):
-			an.play_backwards("left front sword and shield block",blend)
+			an.play_backwards("block shield front left",blend)
 		elif Input.is_action_pressed("forward") and Input.is_action_pressed("right"):
-			an.play("right front sword and shield block", blend)
+			an.play("block shield front right", blend)
 		elif Input.is_action_pressed("backward"):
-			an.play_backwards("walk sword and shield block ",blend)
+			an.play_backwards("block shield front ",blend)
 		elif Input.is_action_pressed("left"):
-			an.play("left sword and shield block",blend)
+			an.play("shield block left",blend)
 		elif Input.is_action_pressed("right"):
-			an.play("right sword and shield block",blend)
+			an.play("shield block right ",blend)
 		elif Input.is_action_pressed("forward"):
-			an.play("walk sword and shield block ",blend)
+			an.play("block shield front ",blend)
 		else:
 			an.play("block shield",blend/2)	
 	else:
@@ -646,7 +650,7 @@ func animationsSwordAndShield(delta):
 		elif is_sliding and attacking:
 			an.play("swirl melee attack",blend)
 		elif is_walking:
-			an.play("walk sword and shield block ",blend)		
+			an.play("walk combat",blend)		
 		else:
 			an.play("idle combat",blend)
 #_________________________________________One handed Sword animations_____________________________________________
@@ -688,7 +692,7 @@ func animations2HSword():
 #_____________________________________________Dual Wielding______________________________________________
 func animationsDualWield():
 	if Input.is_action_pressed("attack"):
-		an.play("combo attack 2w2v", blend)
+		an.play("combo attack 2w", blend)
 	elif is_walking:
 		if not injured:
 			an.play("walk")
@@ -702,7 +706,7 @@ func animationsDualWield():
 		else:
 			an.play("sneak")
 	else:
-		an.play("idle combat 2h", blend)
+		an.play("idle dual wield", blend)
 #__________________________________________Bow______________________________________
 func animationsBow():
 	if Input.is_action_pressed("attack") and is_walking and not is_aiming:
@@ -820,13 +824,27 @@ func stop():
 	can_move = false
 func start():
 	can_move = true 
+	
 #________________________________________Graphic User Interface____________________________________
-#func debugText():
-	#debugger.text = "Memory: %.3f MB" % (OS.get_static_memory_usage() / (1024.0 * 1024.0))
-	#debugger.text += "\nPosition: (%.1f, %.1f, %.1f)" % [global_transform.origin.x, global_transform.origin.y, global_transform.origin.z]
-	#debugger.text += "\nFPS: %d" % (Engine.get_frames_per_second() + rand_range(0,0))
+onready var debugger = $"../RichTextLabel"
+onready var coordinates = $Minimap/Coordinates
+func debugText():
+	debugger.text = "Memory: %.3f MB" % (OS.get_static_memory_usage() / (1024.0 * 1024.0))
+func roundPositionCoordinates():
+	var rounded_position = Vector3(
+		round(global_transform.origin.x * 10) / 10,
+		round(global_transform.origin.y * 10) / 10,
+		round(global_transform.origin.z * 10) / 10
+	)
+	# Use %d to format integers without decimals
+	coordinates.text = "%d, %d, %d" % [rounded_position.x, rounded_position.y, rounded_position.z]
+onready var time_label = $Minimap/Time
+func displayClock():
+	# Get the current date and time
+	var datetime = OS.get_datetime()
 
-
+	# Display hour and minute in the label
+	time_label.text = "Time: %02d:%02d" % [datetime.hour, datetime.minute]	
 	# Include the cooldown information
 	#debugger.text += "\nHeadstrong Rush Cooldown: %.1f" % HeadstrongrushCD.time_left
 #_________________________________________Warden Skills_____________________________________________
@@ -911,8 +929,13 @@ func savePlayerData():
 		"skin3": skin3,
 #skills 
 		"headstrong_rush_ps": headstrong_rush_ps,
-		"pomel_strike_ps": pomel_strike_ps
-		
+		"pomel_strike_ps": pomel_strike_ps,
+#inventory
+		"has_sword0": has_sword0,
+		"has_sword1": has_sword1,
+		"has_sword2": has_sword2,
+		"has_sword3": has_sword3,
+		"has_shield3": has_shield3,
 		}
 	var dir = Directory.new()
 	if !dir.dir_exists(SAVE_DIR):
@@ -1035,6 +1058,17 @@ func loadPlayerData():
 				skin2 = player_data["skin2"]
 			if "skin3" in player_data:
 				skin3 = player_data["skin3"]
+#inventory 
+			if "has_sword0" in player_data:
+				has_sword0 = player_data["has_sword0"]
+			if "has_sword1" in player_data:
+				has_sword1 = player_data["has_sword1"]
+			if "has_sword2" in player_data:
+				has_sword2 = player_data["has_sword2"]
+			if "has_sword3" in player_data:
+				has_sword3 = player_data["has_sword3"]
+			if "has_shield3" in player_data:
+				has_shield3 = player_data["has_shield3"]	
 func resetSavedData():
 	var dir = Directory.new()
 	if dir.file_exists(save_path):
@@ -1113,7 +1147,6 @@ func _on_FPS_pressed():
 		Engine.set_target_fps(15)
 func updateFPS():
 	$Minimap/FPSLabel.text  = "%d" % Engine.get_frames_per_second()
-			
 #_____________________________________________Water Detection________________________________________________________________
 func _on_WaterDetector_area_entered(area):
 	if area.is_in_group("Water"):
@@ -1158,7 +1191,9 @@ func _on_UnstuckCDTimer_timeout():
 		if unstuck_cd < 0:
 			unstuck_cd = 0
 	updateFPS()
-	
+	debugText()
+	roundPositionCoordinates()
+	displayClock()
 	
 func _on_Area_body_entered(body):
 	var aggro_power = -30
@@ -1171,3 +1206,200 @@ func instanceui():
 		var level_ui_instance = level_ui_scene.instance()
 		# Optionally, you can set the position or other properties of the instance here
 		add_child(level_ui_instance)
+
+#__________________________________________________________Weapon Management____________________________________________
+
+#Main Weapon____________________________________________________________________________________________________________
+onready var attachment = $Mesh/Armature020/Skeleton/BoneAttachment
+
+onready var detector = $Mesh/Detector
+onready var sword0: PackedScene = preload("res://weapons/swords/sword0/sword0.tscn")
+onready var sword1: PackedScene = preload("res://weapons/swords/sword1/sword1.tscn")
+onready var sword3: PackedScene = preload("res://weapons/swords/sword3/sword3.tscn")
+onready var model2: PackedScene = preload("res://weapons/swords/sword0/sword0.tscn")
+var currentInstance: Node = null  
+var effect0_applied: bool = false
+var has_sword0 = false
+var has_sword1 = false
+var has_sword2 = false
+var has_sword3 = false
+var got_weapon = false
+
+# Cooldown variables for dropping weapons, this is neccessary to avoid deleting weapon permantly.
+# Without this dropping and picking up weapons continously can destroy weapons forever if done too fast
+var dropCooldown: float = 1.0
+var dropTimer: float = 0.0
+
+func switch():
+	if has_sword0:
+		if currentInstance == null:
+			currentInstance = sword0.instance()
+			currentInstance.get_node("CollisionShape").disabled = true 
+			currentInstance.scale = Vector3(100, 100, 100)
+			attachment.add_child(currentInstance)
+			Effect0(true)
+	elif has_sword1:	
+		if currentInstance == null:
+			currentInstance = sword1.instance()
+			currentInstance.get_node("CollisionShape").disabled = true
+			currentInstance.scale = Vector3(100, 100, 100)
+			attachment.add_child(currentInstance)
+			Effect0(true)
+	elif has_sword3:	
+		if currentInstance == null:
+			currentInstance = sword3.instance()
+			currentInstance.get_node("CollisionShape").disabled = true
+			currentInstance.scale = Vector3(100, 100, 100)
+			attachment.add_child(currentInstance)
+			Effect0(true)				
+func drop():
+	if currentInstance != null:
+		attachment.remove_child(currentInstance)
+		var drop_position = global_transform.origin + direction.normalized() * 1.0
+		currentInstance.global_transform.origin = Vector3(drop_position.x + rand_range(0.3,0.9),global_transform.origin.y + 0.1, drop_position.z)
+		var collision_shape = currentInstance.get_node("CollisionShape")
+		if collision_shape != null:
+			collision_shape.disabled = false
+		get_tree().root.add_child(currentInstance) # gives errors but works, dunno what it means 
+		# Reset variables
+		has_sword0 = false
+		has_sword1 = false
+		has_sword2 = false
+		has_sword3 = false
+		currentInstance = null
+		got_weapon = false
+		Effect0(false)
+func pickUpMainWeapon():
+	var bodies = detector.get_overlapping_bodies()
+	for body in bodies:
+		if currentInstance == null and Input.is_action_pressed("E"):
+			if body.is_in_group("Weapon"):
+				has_sword0 = body.is_in_group("sword0")
+				has_sword1 = body.is_in_group("sword1")
+				has_sword2 = body.is_in_group("sword2")
+				has_sword3 = body.is_in_group("sword3")
+				if not got_weapon:
+					check_and_delete(body)
+				got_weapon = true 
+
+func check_and_delete(body):
+	if body.get_parent() != attachment:
+		body.queue_free()
+
+func Effect0(active: bool):
+	if active and not effect0_applied:
+		effect0_applied = true
+	elif not active and effect0_applied:
+		effect0_applied = false
+
+func dropMainWeapon():
+	if got_weapon and dropTimer <= 0.0 and Input.is_action_just_pressed("drop"):
+		drop()
+		dropTimer = dropCooldown
+		has_sword0 = false
+		has_sword1 = false
+		has_sword2 = false
+		has_sword3 = false
+		got_weapon = false
+		Effect0(false)
+
+func overallMainWeaponLogic(delta):
+	switch()
+	# Update drop cooldown timer
+	if dropTimer > 0.0:
+		dropTimer -= delta
+	pickUpMainWeapon()
+	dropMainWeapon()
+#Secondary Weapon_____________________________________________________________________________________________________________
+onready var attachment_secondary = $Mesh/Armature020/Skeleton/HoldL
+onready var attachment_shield = $Mesh/Armature020/Skeleton/HoldL2
+onready var shield3: PackedScene = preload("res://weapons/shields/shield3/shield3.tscn")
+var current_secondary_Instance: Node = null  
+var effect0_secondary_applied: bool = false
+var has_sec_sword0 = false
+var has_sec_sword1 = false
+var has_sec_sword2 = false
+var has_sec_sword3 = false
+var has_shield3 = false
+var got_sec_weapon = false
+
+func switchSecondary():
+	if has_sec_sword0:
+		if current_secondary_Instance == null:
+			current_secondary_Instance = sword0.instance()
+			current_secondary_Instance.get_node("CollisionShape").disabled = true 
+			current_secondary_Instance.scale = Vector3(100, 100, 100)
+			attachment_secondary.add_child(current_secondary_Instance)
+			Effect0(true)
+	elif has_sec_sword1:	
+		if current_secondary_Instance == null:
+			current_secondary_Instance = sword1.instance()
+			current_secondary_Instance.get_node("CollisionShape").disabled = true
+			current_secondary_Instance.scale = Vector3(100, 100, 100)
+			attachment_secondary.add_child(current_secondary_Instance)
+			Effect0(true)
+	elif has_sec_sword3:	
+		if current_secondary_Instance == null:
+			current_secondary_Instance = sword3.instance()
+			current_secondary_Instance.get_node("CollisionShape").disabled = true
+			current_secondary_Instance.scale = Vector3(100, 100, 100)
+			attachment_secondary.add_child(current_secondary_Instance)
+			Effect0(true)	
+	elif has_shield3:	
+		if current_secondary_Instance == null:
+			current_secondary_Instance = shield3.instance()
+			current_secondary_Instance.get_node("CollisionShape").disabled = true
+			current_secondary_Instance.scale = Vector3(100, 100, 100)
+			attachment_shield.add_child(current_secondary_Instance)
+			Effect0(true)	
+func pickUpSecondaryWeapon():
+	var bodies = detector.get_overlapping_bodies()
+	for body in bodies:
+		if current_secondary_Instance == null and Input.is_action_pressed("E"):
+			if currentInstance != null:
+				if body.is_in_group("Weapon"):
+					has_sec_sword0 = body.is_in_group("sword0")
+					has_sec_sword1 = body.is_in_group("sword1")
+					has_sec_sword2 = body.is_in_group("sword2")
+					has_sec_sword3 = body.is_in_group("sword3")
+					has_shield3 = body.is_in_group("shield3")
+					if not got_sec_weapon:
+						check_and_delete(body)
+					got_sec_weapon = true 
+func dropSecondary():
+	if current_secondary_Instance != null:
+		attachment_secondary.remove_child(current_secondary_Instance)
+		var drop_position = global_transform.origin + direction.normalized() * 1.0
+		current_secondary_Instance.global_transform.origin = Vector3(drop_position.x,global_transform.origin.y + 0.1, drop_position.z + rand_range(0.3,0.9))
+		var collision_shape = current_secondary_Instance.get_node("CollisionShape")
+		if collision_shape != null:
+			collision_shape.disabled = false
+		get_tree().root.add_child(current_secondary_Instance)
+		# Reset variables
+		has_sec_sword0 = false
+		has_sec_sword1 = false
+		has_sec_sword2 = false
+		has_sec_sword3 = false
+		has_shield3 = false
+		got_sec_weapon = false
+		current_secondary_Instance = null
+		got_weapon = false
+		Effect0(false)
+func dropSecondaryWeapon():
+	if got_sec_weapon and dropTimer <= 0.0 and Input.is_action_just_pressed("drop"):
+		dropSecondary()
+		dropTimer = dropCooldown
+		has_sec_sword0 = false
+		has_sec_sword1 = false
+		has_sec_sword2 = false
+		has_sec_sword3 = false
+		has_shield3 = false
+		got_sec_weapon = false
+		Effect0(false)
+func overallSecondaryWeaponLogic(delta):
+	switchSecondary()
+	# Update drop cooldown timer
+	if dropTimer > 0.0:
+		dropTimer -= delta
+	pickUpSecondaryWeapon()
+	dropSecondaryWeapon()
