@@ -296,8 +296,8 @@ func _physics_process(delta):
 			climbing()
 			teleport()
 			minimapFollow()
-			overallMainWeaponLogic(delta)
-			overallSecondaryWeaponLogic(delta)
+			MainWeapon()
+			SecWeapon()
 			if Input.is_action_just_pressed("ui_focus_next"):
 				is_in_combat = !is_in_combat
 			if Input.is_action_just_pressed("1"):
@@ -579,7 +579,6 @@ func ridingCollision():
 		set_collision_mask(1)   # Set to the original collision mask
 #__________________________________Animation Section_____________________________________
 func animationsAll(delta):
-	
 	if is_in_combat:
 		if barehanded_mode:
 			animationsBarehanded()	
@@ -934,6 +933,7 @@ func savePlayerData():
 #inventory
 		"got_weapon": got_weapon,
 		"got_sec_weapon": got_sec_weapon,
+#		"got_shield": got_shield,
 		"has_sword0": has_sword0,
 		"has_sword1": has_sword1,
 		"has_sword2": has_sword2,
@@ -942,7 +942,7 @@ func savePlayerData():
 		"has_sec_sword1": has_sec_sword1,
 		"has_sec_sword2": has_sec_sword2,
 		"has_sec_sword3": has_sec_sword3,
-		"has_shield3": has_shield3,
+#		"has_shield3": has_shield3,
 		
 		}
 	var dir = Directory.new()
@@ -1071,6 +1071,8 @@ func loadPlayerData():
 				got_weapon = player_data["got_weapon"]
 			if "got_sec_weapon" in player_data:
 				got_sec_weapon = player_data["got_sec_weapon"]
+#			if "got_shield" in player_data:
+#				got_shield = player_data["got_shield"]
 			if "has_sword0" in player_data:
 				has_sword0 = player_data["has_sword0"]
 			if "has_sword1" in player_data:
@@ -1087,8 +1089,8 @@ func loadPlayerData():
 				has_sec_sword2 = player_data["has_sec_sword2"]
 			if "has_sec_sword3" in player_data:
 				has_sec_sword3 = player_data["has_sec_sword3"]
-			if "has_shield3" in player_data:
-				has_shield3 = player_data["has_shield3"]	
+#			if "has_shield3" in player_data:
+#				has_shield3 = player_data["has_shield3"]	
 func resetSavedData():
 	var dir = Directory.new()
 	if dir.file_exists(save_path):
@@ -1205,7 +1207,7 @@ func _on_Unstcuk_pressed():
 	if unstuck_cd == 0:
 		unstuck_cd = 1000
 		translation = Vector3(0, 10, 0)
-func _on_UnstuckCDTimer_timeout():
+func _on_OneSecondTimer_timeout():
 	if unstuck_cd > 0:
 		unstuck_cd -= 1
 		if unstuck_cd < 0:
@@ -1214,7 +1216,7 @@ func _on_UnstuckCDTimer_timeout():
 	debugText()
 	roundPositionCoordinates()
 	displayClock()
-	
+
 func _on_Area_body_entered(body):
 	var aggro_power = -30
 	var damage = rand_range(1, 90)
@@ -1227,198 +1229,145 @@ func instanceui():
 		# Optionally, you can set the position or other properties of the instance here
 		add_child(level_ui_instance)
 #__________________________________________________________Weapon Management____________________________________________
-
 #Main Weapon____________________________________________________________________________________________________________
-onready var attachment = $Mesh/Armature020/Skeleton/BoneAttachment
-
+onready var attachment_r = $Mesh/Armature020/Skeleton/HoldR
 onready var detector = $Mesh/Detector
-onready var sword0: PackedScene = preload("res://weapons/swords/sword0/sword0.tscn")
-onready var sword1: PackedScene = preload("res://weapons/swords/sword1/sword1.tscn")
-onready var sword3: PackedScene = preload("res://weapons/swords/sword3/sword3.tscn")
-onready var model2: PackedScene = preload("res://weapons/swords/sword0/sword0.tscn")
+var sword0: PackedScene = preload("res://weapons/swords/sword0/sword0.tscn")
+var sword1: PackedScene = preload("res://weapons/swords/sword1/sword1.tscn")
+var sword2: PackedScene = preload("res://weapons/swords/sword3/sword3.tscn")
 var currentInstance: Node = null  
-var effect0_applied: bool = false
 var has_sword0 = false
 var has_sword1 = false
 var has_sword2 = false
 var has_sword3 = false
 var got_weapon = false
 
-# Cooldown variables for dropping weapons, this is neccessary to avoid deleting weapon permantly.
-# Without this dropping and picking up weapons continously can destroy weapons forever if done too fast
-var dropCooldown: float = 1.0
-var dropTimer: float = 0.0
 
+func fixInstance():
+	attachment_r.add_child(currentInstance)
+	currentInstance.get_node("CollisionShape").disabled = true
+	currentInstance.scale = Vector3(100, 100, 100)
+	got_weapon = true
 func switch():
 	if has_sword0:
 		if currentInstance == null:
 			currentInstance = sword0.instance()
-			currentInstance.get_node("CollisionShape").disabled = true 
-			currentInstance.scale = Vector3(100, 100, 100)
-			attachment.add_child(currentInstance)
-			Effect0(true)
-	elif has_sword1:	
+			fixInstance()
+	elif has_sword1:    
 		if currentInstance == null:
 			currentInstance = sword1.instance()
-			currentInstance.get_node("CollisionShape").disabled = true
-			currentInstance.scale = Vector3(100, 100, 100)
-			attachment.add_child(currentInstance)
-			Effect0(true)
-	elif has_sword3:	
+			fixInstance()
+	elif has_sword2:    
 		if currentInstance == null:
-			currentInstance = sword3.instance()
-			currentInstance.get_node("CollisionShape").disabled = true
-			currentInstance.scale = Vector3(100, 100, 100)
-			attachment.add_child(currentInstance)
-			Effect0(true)				
+			currentInstance = sword2.instance()
+			fixInstance()
 func drop():
-	if currentInstance != null:
-		attachment.remove_child(currentInstance)
+	if currentInstance != null and Input.is_action_just_pressed("drop") and got_weapon:
+		attachment_r.remove_child(currentInstance)
+		# Set the drop position
 		var drop_position = global_transform.origin + direction.normalized() * 1.0
-		currentInstance.global_transform.origin = Vector3(drop_position.x + rand_range(0.3,0.9),global_transform.origin.y + 0.1, drop_position.z)
+		currentInstance.global_transform.origin = Vector3(drop_position.x - rand_range(-0.3, 1), global_transform.origin.y + 0.2, drop_position.z + rand_range(-0.5, 0.88))
+		# Set the scale of the dropped instance
+		currentInstance.scale = Vector3(1, 1, 1)
 		var collision_shape = currentInstance.get_node("CollisionShape")
 		if collision_shape != null:
 			collision_shape.disabled = false
-		get_tree().root.add_child(currentInstance) # gives errors but works, dunno what it means 
+		get_tree().root.add_child(currentInstance)
 		# Reset variables
 		has_sword0 = false
 		has_sword1 = false
 		has_sword2 = false
-		has_sword3 = false
-		currentInstance = null
 		got_weapon = false
-		Effect0(false)
-func pickUpMainWeapon():
+		currentInstance = null
+func pickItemsMainHand():
 	var bodies = detector.get_overlapping_bodies()
 	for body in bodies:
-		if currentInstance == null and Input.is_action_pressed("E"):
-			if body.is_in_group("Weapon"):
-				has_sword0 = body.is_in_group("sword0")
-				has_sword1 = body.is_in_group("sword1")
-				has_sword2 = body.is_in_group("sword2")
-				has_sword3 = body.is_in_group("sword3")
-				if not got_weapon:
-					check_and_delete(body)
-				got_weapon = true 
-func check_and_delete(body):
-	if body.get_parent() != attachment:
-		body.queue_free()
-
-func Effect0(active: bool):
-	if active and not effect0_applied:
-		effect0_applied = true
-	elif not active and effect0_applied:
-		effect0_applied = false
-
-func dropMainWeapon():
-	if got_weapon and dropTimer <= 0.0 and Input.is_action_just_pressed("drop"):
+		if currentInstance == null:
+			if Input.is_action_pressed("E"):
+				if body.is_in_group("sword0") and not got_weapon:
+					has_sword0 = true
+					got_weapon = true  # Set the flag to prevent picking up multiple items simultaneously
+					body.queue_free()  # Remove the picked-up item from the floor
+				elif body.is_in_group("sword1") and not got_weapon:
+					has_sword1 = true
+					got_weapon = true  # Set the flag to prevent picking up multiple items simultaneously
+					body.queue_free()  # Remove the picked-up item from the floor
+				elif body.is_in_group("sword3") and not got_weapon:
+					has_sword2 = true
+					got_weapon = true  # Set the flag to prevent picking up multiple items simultaneously
+					body.queue_free()  # Remove the picked-up item from the floor
+		elif currentInstance != null and sec_currentInstance == null:
+			if  Input.is_action_pressed("E"):
+				if body.is_in_group("sword0") and not got_sec_weapon:
+					has_sec_sword0 = true
+					got_sec_weapon = true  # Set the flag to prevent picking up multiple items simultaneously
+					body.queue_free()  # Remove the picked-up item from the floor
+				elif body.is_in_group("sword1") and not got_sec_weapon:
+					has_sec_sword1 = true
+					got_sec_weapon = true  # Set the flag to prevent picking up multiple items simultaneously
+					body.queue_free()  # Remove the picked-up item from the floor
+				elif body.is_in_group("sword3") and not got_sec_weapon:
+					has_sec_sword2 = true
+					got_sec_weapon = true  # Set the flag to prevent picking up multiple items simultaneously
+					body.queue_free()  # Remove the picked-up item from the floor
+func MainWeapon():
+	pickItemsMainHand()
+	switch()
+	if Input.is_action_just_pressed("drop"):
 		drop()
-		dropTimer = dropCooldown
 		has_sword0 = false
 		has_sword1 = false
 		has_sword2 = false
-		has_sword3 = false
-		got_weapon = false
-		Effect0(false)
-
-func overallMainWeaponLogic(delta):
-	switch()
-	pickUpMainWeapon()
-	dropMainWeapon()	
-	# Update drop cooldown timer
-	if dropTimer > 0.0:
-		dropTimer -= delta
-
-#Secondary Weapon_____________________________________________________________________________________________________________
-onready var attachment_secondary = $Mesh/Armature020/Skeleton/HoldL
-onready var attachment_shield = $Mesh/Armature020/Skeleton/HoldL2
-onready var shield3: PackedScene = preload("res://weapons/shields/shield3/shield3.tscn")
-var current_secondary_Instance: Node = null  
-var effect0_secondary_applied: bool = false
+#Secondary__________________________________________________________________________________________
+onready var attachment_l = $Mesh/Armature020/Skeleton/HoldL
+var sec_currentInstance: Node = null  
 var has_sec_sword0 = false
 var has_sec_sword1 = false
 var has_sec_sword2 = false
 var has_sec_sword3 = false
-var has_shield3 = false
 var got_sec_weapon = false
 
-func switchSecondary():
+
+func fixSecInstance():
+	attachment_l.add_child(sec_currentInstance)
+	sec_currentInstance.get_node("CollisionShape").disabled = true
+	sec_currentInstance.scale = Vector3(100, 100, 100)
+	got_sec_weapon = true
+func switchSec():
 	if has_sec_sword0:
-		if current_secondary_Instance == null:
-			current_secondary_Instance = sword0.instance()
-			current_secondary_Instance.get_node("CollisionShape").disabled = true 
-			current_secondary_Instance.scale = Vector3(100, 100, 100)
-			attachment_secondary.add_child(current_secondary_Instance)
-			Effect0(true)
-	elif has_sec_sword1:	
-		if current_secondary_Instance == null:
-			current_secondary_Instance = sword1.instance()
-			current_secondary_Instance.get_node("CollisionShape").disabled = true
-			current_secondary_Instance.scale = Vector3(100, 100, 100)
-			attachment_secondary.add_child(current_secondary_Instance)
-			Effect0(true)
-	elif has_sec_sword3:	
-		if current_secondary_Instance == null:
-			current_secondary_Instance = sword3.instance()
-			current_secondary_Instance.get_node("CollisionShape").disabled = true
-			current_secondary_Instance.scale = Vector3(100, 100, 100)
-			attachment_secondary.add_child(current_secondary_Instance)
-			Effect0(true)	
-	elif has_shield3:	
-		if current_secondary_Instance == null:
-			current_secondary_Instance = shield3.instance()
-			current_secondary_Instance.get_node("CollisionShape").disabled = true
-			current_secondary_Instance.scale = Vector3(100, 100, 100)
-			attachment_shield.add_child(current_secondary_Instance)
-			Effect0(true)	
-func pickUpSecondaryWeapon():
-	var bodies = detector.get_overlapping_bodies()
-	for body in bodies:
-		if current_secondary_Instance == null and Input.is_action_pressed("E"):
-			if currentInstance != null:
-				if body.is_in_group("Weapon"):
-					has_sec_sword0 = body.is_in_group("sword0")
-					has_sec_sword1 = body.is_in_group("sword1")
-					has_sec_sword2 = body.is_in_group("sword2")
-					has_sec_sword3 = body.is_in_group("sword3")
-					has_shield3 = body.is_in_group("shield3")
-					if not got_sec_weapon:
-						check_and_delete(body)
-					got_sec_weapon = true
-func dropSecondary():
-	if current_secondary_Instance != null:
-		attachment_secondary.remove_child(current_secondary_Instance)
+		if sec_currentInstance == null:
+			sec_currentInstance = sword0.instance()
+			fixSecInstance()
+	elif has_sec_sword1:    
+		if sec_currentInstance == null:
+			sec_currentInstance = sword1.instance()
+			fixSecInstance()
+	elif has_sec_sword2:    
+		if sec_currentInstance == null:
+			sec_currentInstance = sword2.instance()
+			fixSecInstance()
+func dropSec():
+	if sec_currentInstance != null and Input.is_action_just_pressed("drop") and got_sec_weapon:
+		attachment_l.remove_child(sec_currentInstance)
+		# Set the drop position
 		var drop_position = global_transform.origin + direction.normalized() * 1.0
-		current_secondary_Instance.global_transform.origin = Vector3(drop_position.x,global_transform.origin.y + 0.1, drop_position.z + rand_range(0.3,0.9))
-		var collision_shape = current_secondary_Instance.get_node("CollisionShape")
+		sec_currentInstance.global_transform.origin = Vector3(drop_position.x - rand_range(-0.3, 1), global_transform.origin.y + 0.2, drop_position.z + rand_range(-0.5, 0.88))
+		# Set the scale of the dropped instance
+		sec_currentInstance.scale = Vector3(1, 1, 1)
+		var collision_shape = sec_currentInstance.get_node("CollisionShape")
 		if collision_shape != null:
 			collision_shape.disabled = false
-		get_tree().root.add_child(current_secondary_Instance)
+		get_tree().root.add_child(sec_currentInstance)
 		# Reset variables
 		has_sec_sword0 = false
 		has_sec_sword1 = false
 		has_sec_sword2 = false
-		has_sec_sword3 = false
-		has_shield3 = false
 		got_sec_weapon = false
-		current_secondary_Instance = null
-		got_weapon = false
-		Effect0(false)
-func dropSecondaryWeapon():
-	if got_sec_weapon and dropTimer <= 0.0 and Input.is_action_just_pressed("drop"):
-		dropSecondary()
-		dropTimer = dropCooldown
+		sec_currentInstance = null
+func SecWeapon():
+	switchSec()
+	if Input.is_action_just_pressed("drop"):
+		dropSec()
 		has_sec_sword0 = false
 		has_sec_sword1 = false
 		has_sec_sword2 = false
-		has_sec_sword3 = false
-		has_shield3 = false
-		got_sec_weapon = false
-		Effect0(false)
-func overallSecondaryWeaponLogic(delta):
-	switchSecondary()
-	pickUpSecondaryWeapon()
-	dropSecondaryWeapon()
-	# Update drop cooldown timer
-	if dropTimer > 0.0:
-		dropTimer -= delta
