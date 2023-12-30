@@ -298,6 +298,7 @@ func _physics_process(delta):
 			minimapFollow()
 			MainWeapon()
 			SecWeapon()
+			ShieldManagement()
 			if Input.is_action_just_pressed("ui_focus_next"):
 				is_in_combat = !is_in_combat
 			if Input.is_action_just_pressed("1"):
@@ -531,10 +532,10 @@ var mouse_captured = true
 var touch_start_position = Vector2.ZERO
 var zoom_speed = 0.1
 # Add this function to handle zooming logic
-func Zoom(direction):
+func Zoom(zoom_direction):
 	# Adjust the camera's position based on the zoom direction
-	camera.translation.y += direction * zoom_speed
-	camera.translation.z -= direction * zoom_speed
+	camera.translation.y += zoom_direction * zoom_speed
+	camera.translation.z -= zoom_direction * zoom_speed
 func _on_Sensitivity_pressed():
 	$Minimap/sensitivity_label.text = "cam sens:  " + str(h_sensitivity)
 	h_sensitivity += 0.025
@@ -1282,8 +1283,8 @@ func drop():
 func pickItemsMainHand():
 	var bodies = detector.get_overlapping_bodies()
 	for body in bodies:
-		if currentInstance == null:
-			if Input.is_action_pressed("E"):
+		if Input.is_action_pressed("E"):
+			if currentInstance == null:
 				if body.is_in_group("sword0") and not got_weapon:
 					has_sword0 = true
 					got_weapon = true  # Set the flag to prevent picking up multiple items simultaneously
@@ -1296,8 +1297,7 @@ func pickItemsMainHand():
 					has_sword2 = true
 					got_weapon = true  # Set the flag to prevent picking up multiple items simultaneously
 					body.queue_free()  # Remove the picked-up item from the floor
-		elif currentInstance != null and sec_currentInstance == null:
-			if  Input.is_action_pressed("E"):
+			elif currentInstance != null and sec_currentInstance == null:
 				if body.is_in_group("sword0") and not got_sec_weapon:
 					has_sec_sword0 = true
 					got_sec_weapon = true  # Set the flag to prevent picking up multiple items simultaneously
@@ -1310,6 +1310,7 @@ func pickItemsMainHand():
 					has_sec_sword2 = true
 					got_sec_weapon = true  # Set the flag to prevent picking up multiple items simultaneously
 					body.queue_free()  # Remove the picked-up item from the floor
+
 func MainWeapon():
 	pickItemsMainHand()
 	switch()
@@ -1326,7 +1327,6 @@ var has_sec_sword1 = false
 var has_sec_sword2 = false
 var has_sec_sword3 = false
 var got_sec_weapon = false
-
 
 func fixSecInstance():
 	attachment_l.add_child(sec_currentInstance)
@@ -1346,6 +1346,15 @@ func switchSec():
 		if sec_currentInstance == null:
 			sec_currentInstance = sword2.instance()
 			fixSecInstance()
+func pickUpShield():
+	var bodies = detector.get_overlapping_bodies()
+	for body in bodies:
+		if Input.is_action_pressed("E"):
+			if shield_currentInstance == null:
+				if body.is_in_group("shield3") and not got_shield:
+					has_shield0 = true
+					got_shield = true
+					body.queue_free()
 func dropSec():
 	if sec_currentInstance != null and Input.is_action_just_pressed("drop") and got_sec_weapon:
 		attachment_l.remove_child(sec_currentInstance)
@@ -1371,3 +1380,43 @@ func SecWeapon():
 		has_sec_sword0 = false
 		has_sec_sword1 = false
 		has_sec_sword2 = false
+#Shield_____________________________________________________________________________________________
+onready var attachment_s = $Mesh/Armature020/Skeleton/HoldL2
+var shield0: PackedScene = preload("res://weapons/shields/shield3/shield3.tscn")
+var shield_currentInstance: Node = null 
+var has_shield0 = false
+var got_shield = false
+
+func fixShieldInstance():
+	attachment_s.add_child(shield_currentInstance)
+	shield_currentInstance.get_node("CollisionShape").disabled = true
+	shield_currentInstance.scale = Vector3(100, 100, 100)
+	got_shield = true
+func switchShield():
+	if has_shield0:
+		if shield_currentInstance == null:
+			shield_currentInstance = shield0.instance()
+			fixShieldInstance()
+
+func dropShield():
+	if shield_currentInstance != null and Input.is_action_just_pressed("drop"):
+		attachment_s.remove_child(shield_currentInstance)
+		# Set the drop position
+		var drop_position = global_transform.origin + direction.normalized() * 1.0
+		shield_currentInstance.global_transform.origin = Vector3(drop_position.x - rand_range(-0.3, 1), global_transform.origin.y + 0.2, drop_position.z + rand_range(-0.5, 0.88))
+		# Set the scale of the dropped instance
+		shield_currentInstance.scale = Vector3(1, 1, 1)
+		var collision_shape = shield_currentInstance.get_node("CollisionShape")
+		if collision_shape != null:
+			collision_shape.disabled = false
+		get_tree().root.add_child(shield_currentInstance)
+		# Reset variables
+		has_shield0 = false
+		got_shield = false
+		shield_currentInstance = null
+func ShieldManagement():
+	pickUpShield()
+	switchShield()
+	if Input.is_action_just_pressed("drop"):
+		dropShield()
+		has_shield0 = false
